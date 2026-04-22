@@ -47,8 +47,12 @@ def crear_datos_prueba(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
-        ('kardex', '0004_merge_20260422_XXXX'),  # REEMPLAZA ESTO con el nombre de tu migración anterior (la 0004)
+        # Dependencia mínima: el sistema de usuarios de Django debe estar listo
+        ('auth', '__first__'),
+        # Dependencia de tu propia app: la migración que creó PerfilUsuario y Ubicacion
+        ('kardex', '0001_initial'),
     ]
 
     operations = [
