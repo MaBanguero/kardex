@@ -24,7 +24,6 @@ def crear_datos_prueba(apps, schema_editor):
     ]
 
     for data in usuarios_test:
-        # get_or_create evita duplicados si ya ejecutaste el comando antes
         u, created = User.objects.get_or_create(
             username=data['user'],
             defaults={
@@ -37,7 +36,7 @@ def crear_datos_prueba(apps, schema_editor):
         # Asignamos el rol
         u.groups.add(data['group'])
 
-        # Vinculamos el PerfilUsuario para evitar el Error 500 al entrar al Dashboard
+        # Vinculamos el PerfilUsuario para evitar el Error 500
         PerfilUsuario.objects.get_or_create(
             usuario=u,
             defaults={
@@ -45,3 +44,13 @@ def crear_datos_prueba(apps, schema_editor):
                 'ubicacion_asignada': sede
             }
         )
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ('kardex', '0004_merge_20260422_XXXX'),  # REEMPLAZA ESTO con el nombre de tu migración anterior (la 0004)
+    ]
+
+    operations = [
+        migrations.RunPython(crear_datos_prueba),
+    ]
