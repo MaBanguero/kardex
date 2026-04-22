@@ -1,0 +1,364 @@
+<script>
+    // ==========================================
+    // 1. CONFIGURACIÓN GLOBAL Y CACHÉ
+    // ==========================================
+    const CACHE_KEY = 'kardex_data_{{ ubicacion.id }}';
+    const CACHE_TIME = 'kardex_time_{{ ubicacion.id }}';
+    const MAX_AGE = 3 * 60 * 1000; // 3 minutos
+
+    const buscador = document.getElementById('buscador-kardex');
+    const contMov = document.getElementById('contenedor-movil');
+    const contEsc = document.getElementById('contenedor-escritorio');
+
+    // ==========================================
+    // 2. INICIALIZACIÓN (Stale-While-Revalidate)
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+        const cached = localStorage.getItem(CACHE_KEY);
+        const time = localStorage.getItem(CACHE_TIME);
+        const expired = !time || (new Date().getTime() - time > MAX_AGE);
+
+        if (cached) {
+            // Pasamos un string vacío para forzar la agrupación al cargar
+            ejecutarFiltro('');
+            if (expired) sincronizarServidor(false);
+        } else {
+            sincronizarServidor(true);
+        }
+    });
+
+    function sincronizarServidor(render) {
+        if (render) {
+            contMov.innerHTML = `<div class="p-12 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i><p>Sincronizando...</p></div>`;
+            contEsc.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-2xl mb-2"></i><p>Sincronizando...</p></td></tr>`;
+        }
+
+        fetch("{% url 'sincronizar_inventario_api' %}")
+            .then(res => res.json())
+            .then(data => {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data.inventario));
+                localStorage.setItem(CACHE_TIME, new Date().getTime().toString());
+                if (render || (buscador && buscador.value)) ejecutarFiltro(buscador ? buscador.value : '');
+            })
+            .catch(err => console.error("Error sincronizando catálogo:", err));
+    }
+
+    // ==========================================
+    // 3. BUSCADOR INSTANTÁNEO Y AGRUPACIÓN (FEFO)
+    // ==========================================
+    if (buscador) {
+        buscador.addEventListener('input', (e) => ejecutarFiltro(e.target.value));
+    }
+
+    function ejecutarFiltro(q) {
+        const query = q.toLowerCase().trim();
+        const dataRaw = localStorage.getItem(CACHE_KEY);
+        if (!dataRaw) return;
+
+        const data = JSON.parse(dataRaw);
+        const filtered = query === '' ? data : data.filter(i => i.busqueda.includes(query));
+
+        // MAGIA: Agrupamos por Nombre + Forma Farmacéutica
+        const grouped = {};
+        filtered.forEach(item => {
+            const key = (item.principio_activo + '||' + item.forma_farmaceutica).toUpperCase().trim();
+
+            if (!grouped[key]) {
+                grouped[key] = {
+                    id_virtual: key.replace(/[^A-Z0-9]/g, ''), // ID seguro para el HTML
+                    principio_activo: item.principio_activo,
+                    forma_farmaceutica: item.forma_farmaceutica,
+                    cantidad_actual: 0,
+                    stock_minimo: item.stock_minimo,
+                    lotes_set: new Set(),
+                    fechas: []
+                };
+            }
+            grouped[key].cantidad_actual += item.cantidad_actual;
+            grouped[key].lotes_set.add(item.lote);
+            grouped[key].fechas.push(item.fecha_vencimiento);
+        });
+
+        // Convertimos Sets a Textos
+        const resultados = Object.values(grouped).map(g => {
+            g.lote_txt = g.lotes_set.size > 1 ? `${g.lotes_set.size} Lotes distintos` : Array.from(g.lotes_set)[0];
+            g.fecha_txt = g.fechas.length > 1 ? 'Múltiples Fechas (FEFO)' : g.fechas[0];
+            return g;
+        });
+
+        renderizarResultados(resultados);
+    }
+
+    function renderizarResultados(items) {
+        if (!items.length) {
+            const empty = `<div class="p-16 text-center text-slate-400 italic"><i class="fas fa-box-open text-3xl mb-3 opacity-50 block"></i>No hay registros en inventario</div>`;
+            contMov.innerHTML = empty;
+            contEsc.innerHTML = `<tr><td colspan="4">${empty}</td></tr>`;
+            return;
+        }
+
+        let mHtml = '', dHtml = '';
+        items.forEach(i => {
+            const low = i.cantidad_actual <= i.stock_minimo;
+            const badge = `<span class="text-[10px] font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded shadow-sm text-slate-600"><i class="fas fa-layer-group mr-1 opacity-50"></i>${i.lote_txt}</span>`;
+
+            mHtml += `
+            <div class="p-6 border-b border-slate-100">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="pr-4"><h4 class="font-bold text-slate-900 leading-tight">${i.principio_activo}</h4><p class="text-[10px] text-slate-500 uppercase mt-1 font-bold">${i.forma_farmaceutica}</p></div>
+                    <div class="text-right"><span id="stock-qty-mob-${i.id_virtual}" class="text-3xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></div>
+                </div>
+                <div class="flex gap-3 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="flex-1"><p class="text-[9px] font-bold text-slate-400 mb-1">LOTE</p>${badge}</div>
+                    <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VENCE</p><p class="text-[11px] font-bold text-slate-600">${i.fecha_txt}</p></div>
+                </div>
+               <button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}')" class="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition">Registrar Movimiento</button>
+            </div>`;
+
+            dHtml += `
+            <tr class="hover:bg-slate-50 transition">
+                <td class="px-6 py-5"><p class="font-bold text-slate-800">${i.principio_activo}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
+                <td class="px-6 py-5">${badge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
+                <td class="px-6 py-5 text-center"><span id="stock-qty-${i.id_virtual}" class="text-2xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></td>
+                <td class="px-6 py-5 text-right"><button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}')" class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
+            </tr>`;
+        });
+        contMov.innerHTML = mHtml;
+        contEsc.innerHTML = dHtml;
+    }
+
+    // ==========================================
+    // 4. LÓGICA DE PESTAÑAS (TABS)
+    // ==========================================
+    function cambiarPestaña(tab) {
+        const btnI = document.getElementById('tab-inventario'), btnH = document.getElementById('tab-historial');
+        const vI = document.getElementById('vista-inventario'), vH = document.getElementById('vista-historial');
+
+        if (tab === 'inventario') {
+            vI.classList.replace('hidden', 'block');
+            vH.classList.replace('block', 'hidden');
+            btnI.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
+            btnH.className = "flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
+        } else {
+            vH.classList.replace('hidden', 'block');
+            vI.classList.replace('block', 'hidden');
+            btnH.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
+            btnI.className = "flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
+
+            cargarHistorial();
+        }
+    }
+
+    // ==========================================
+    // 5. CARGA DE HISTORIAL Y DEVOLUCIONES
+    // ==========================================
+    function cargarHistorial() {
+        const cont = document.getElementById('contenedor-historial');
+        cont.innerHTML = `<div class="p-12 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i><p>Consultando registros...</p></div>`;
+
+        fetch("{% url 'api_historial' %}")
+            .then(res => res.json())
+            .then(data => {
+                if (!data.historial || data.historial.length === 0) {
+                    cont.innerHTML = `<div class="p-10 text-center text-slate-500 italic"><i class="fas fa-clipboard-list text-3xl mb-3 opacity-50 block"></i>No hay movimientos recientes.</div>`;
+                    return;
+                }
+
+                let html = '';
+                data.historial.forEach(mov => {
+                    // 1. EL BOTÓN AHORA USA 'cantidad_restante'
+                    // Esto evita que devuelvan más de lo que queda disponible
+                    const btnDevolver = mov.puede_devolver
+                        ? `<button onclick="abrirModalDev(${mov.doc_id}, '${mov.medicamento}', '${mov.paciente}', ${mov.cantidad_restante})" class="mt-3 w-full bg-slate-50 text-blue-600 border border-blue-200 py-3 rounded-xl text-sm font-bold hover:bg-blue-100 transition flex items-center justify-center gap-2"><i class="fas fa-undo"></i> Devolver (Máx: ${mov.cantidad_restante})</button>`
+                        : `<div class="mt-3 text-center text-xs font-bold text-slate-400 bg-slate-50 py-3 rounded-xl border border-slate-100"><i class="fas fa-lock mr-1"></i> ${mov.estado_txt}</div>`;
+
+                    // 2. NOTA VISUAL DE DEVOLUCIONES PARCIALES
+                    const notaDevolucion = mov.cantidad_devuelta > 0
+                        ? `<div class="mt-2 inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm"><i class="fas fa-reply text-emerald-500"></i> Ya devolviste ${mov.cantidad_devuelta} unidades</div>`
+                        : '';
+
+                    html += `
+                    <div class="p-5 hover:bg-slate-50 transition border-b border-slate-50">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">${mov.fecha}</span>
+                                <h4 class="font-bold text-slate-800 text-lg leading-tight mt-1">${mov.medicamento}</h4>
+                                <p class="text-sm text-slate-500 mt-1"><i class="fas fa-user-injured opacity-50 mr-1"></i> ${mov.paciente}</p>
+                                ${notaDevolucion}
+                            </div>
+                            <div class="text-right">
+                                <span class="text-2xl font-black text-red-500">-${mov.cantidad_original}</span>
+                            </div>
+                        </div>
+                        ${btnDevolver}
+                    </div>`;
+                });
+                cont.innerHTML = html;
+            })
+            .catch(err => {
+                console.error("Error al cargar historial:", err);
+                cont.innerHTML = `<div class="p-8 text-center text-red-400">Error al consultar el historial.</div>`;
+            });
+    }
+
+    // ==========================================
+    // 6. CONTROLADORES DE INTERFAZ (MODALES)
+    // ==========================================
+
+    const modalContainer = document.getElementById('modal-container');
+    const modalBox = document.getElementById('modal-box');
+
+    function abrirModal(id_virtual, nombre) {
+        document.getElementById('modal-id-med').value = id_virtual; // Guarda el ID Virtual
+        document.getElementById('modal-nombre-med').innerText = nombre;
+        document.getElementById('modal-paciente').value = '';
+        document.getElementById('modal-cantidad').value = '';
+
+
+        modalContainer.classList.remove('hidden');
+        modalContainer.classList.add('flex');
+        setTimeout(() => { modalBox.classList.remove('scale-95', 'opacity-0'); modalBox.classList.add('scale-100', 'opacity-100'); }, 10);
+    }
+
+    function cerrarModal() {
+        modalBox.classList.add('scale-95', 'opacity-0');
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        setTimeout(() => { modalContainer.classList.add('hidden'); modalContainer.classList.remove('flex'); }, 300);
+    }
+
+    const modalDev = document.getElementById('modal-devolucion');
+    const boxDev = document.getElementById('box-devolucion');
+
+    function abrirModalDev(docId, medNombre, paciente, maxCant, stockId) {
+        document.getElementById('dev-doc-id').value = docId;
+
+        const inputStock = document.getElementById('dev-stock-id');
+        if(inputStock && stockId) inputStock.value = stockId;
+
+        document.getElementById('dev-med-nombre').innerText = medNombre; // Nombre para el payload
+        document.getElementById('dev-paciente').innerText = paciente;
+
+        const inputCant = document.getElementById('dev-cantidad');
+        inputCant.value = maxCant;
+        inputCant.max = maxCant;
+
+        modalDev.classList.remove('hidden');
+        modalDev.classList.add('flex');
+        setTimeout(() => { boxDev.classList.remove('scale-95', 'opacity-0'); boxDev.classList.add('scale-100', 'opacity-100'); }, 10);
+    }
+
+    function cerrarModalDev() {
+        boxDev.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => { modalDev.classList.add('hidden'); modalDev.classList.remove('flex'); }, 300);
+    }
+
+    // ==========================================
+    // 7. ENVÍO DE FORMULARIOS (TRANSACCIONES)
+    // ==========================================
+
+    // Enviar Movimiento de Salida (Inteligente - FEFO)
+    document.getElementById('form-movimiento').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('btn-submit');
+        const idVirtual = document.getElementById('modal-id-med').value; // ID de animación
+        const nombreMed = document.getElementById('modal-nombre-med').innerText;
+        const cantSolicitada = parseInt(document.getElementById('modal-cantidad').value);
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...';
+
+        const payload = {
+            tipo_mov: document.getElementById('modal-tipo').value,
+            nombre_medicamento: document.getElementById('modal-nombre-med').innerText, // Enviamos el nombre
+            id_paciente: document.getElementById('modal-paciente').value,
+            cantidad: parseInt(document.getElementById('modal-cantidad').value)
+        };
+
+        fetch("{% url 'registrar_movimiento' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Sincronización silenciosa obligatoria porque varios lotes cambiaron en DB
+                sincronizarServidor(false);
+
+                // Animación visual predictiva
+                const elDesktop = document.getElementById(`stock-qty-${idVirtual}`);
+                const elMobile = document.getElementById(`stock-qty-mob-${idVirtual}`);
+
+                const anim = (el) => {
+                    if (el) {
+                        const newQty = parseInt(el.innerText) - cantSolicitada;
+                        el.innerText = newQty;
+                        el.classList.add('scale-[1.3]', 'text-green-500');
+                        setTimeout(() => el.classList.remove('scale-[1.3]', 'text-green-500'), 800);
+                    }
+                };
+
+                anim(elDesktop);
+                anim(elMobile);
+                cerrarModal();
+
+            } else {
+                alert("Error de validación: " + data.mensaje);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error de red al registrar movimiento.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = "Confirmar Registro";
+        });
+    });
+
+    // Enviar Devolución
+    document.getElementById('form-devolucion').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        const payload = {
+            tipo_mov: 'DEVOLUCION',
+            nombre_medicamento: document.getElementById('dev-med-nombre').innerText,
+            id_paciente: document.getElementById('dev-paciente').innerText,
+            cantidad: parseInt(document.getElementById('dev-cantidad').value)
+        };
+
+        fetch("{% url 'registrar_movimiento' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                sincronizarServidor(false);
+                cerrarModalDev();
+                cargarHistorial();
+            } else {
+                alert("Error de validación: " + data.mensaje);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error de red al procesar devolución.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = "Confirmar";
+        });
+    });
+</script>

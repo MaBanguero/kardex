@@ -1,0 +1,127 @@
+<div id="modal-usuario-container" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden transform scale-95 opacity-0 duration-300" id="modal-usuario-box">
+        <div class="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <h3 id="user-modal-title" class="font-black text-slate-800">Gestión de Colaborador</h3>
+            <button onclick="cerrarModalUsuario()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
+
+        <form id="form-usuario" class="p-8 space-y-5">
+            {% csrf_token %}
+            <input type="hidden" id="user-id">
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Login (Username)</label>
+                    <input type="text" id="u-username" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nombres</label>
+                    <input type="text" id="u-fname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Apellidos</label>
+                    <input type="text" id="u-lname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none">
+                </div>
+
+                <div class="col-span-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Cédula / Identificación</label>
+                    <input type="text" id="u-identificacion" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono font-bold text-blue-700">
+                </div>
+
+                <div class="col-span-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Roles y Permisos (Multiselección)</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200" id="contenedor-roles">
+                        {% for rol in roles %}
+                        <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-transparent hover:border-blue-200 cursor-pointer transition shadow-sm">
+                            <input type="checkbox" name="roles_usuario" value="{{ rol.name }}" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+                            <span class="text-xs font-bold text-slate-700">{{ rol.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Sede Asignada</label>
+                    <select id="u-sede" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 outline-none focus:ring-4 focus:ring-blue-500/10 transition font-bold text-slate-700">
+                        {% for s in sedes %}
+                        <option value="{{ s.id }}">{{ s.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-span-2 pt-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nueva Contraseña</label>
+                    <input type="password" id="u-pass" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Opcional en edición">
+                </div>
+            </div>
+
+            <button type="submit" id="btn-save-user" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all active:scale-95">
+                Guardar Cambios
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const uCont = document.getElementById('modal-usuario-container');
+    const uBox = document.getElementById('modal-usuario-box');
+
+    function abrirModalUsuario() {
+        document.getElementById('form-usuario').reset();
+        document.getElementById('user-id').value = "";
+        document.getElementById('u-username').disabled = false;
+        document.getElementById('user-modal-title').innerText = "Nuevo Colaborador";
+        uCont.classList.replace('hidden', 'flex');
+        setTimeout(() => uBox.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+
+    function cerrarModalUsuario() {
+        uBox.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => uCont.classList.replace('flex', 'hidden'), 300);
+    }
+
+    function editarUsuario(item) {
+        abrirModalUsuario();
+        document.getElementById('user-modal-title').innerText = "Editar: " + item.username;
+        document.getElementById('user-id').value = item.id;
+        document.getElementById('u-username').value = item.username;
+        document.getElementById('u-username').disabled = true;
+        document.getElementById('u-fname').value = item.fname;
+        document.getElementById('u-lname').value = item.lname;
+        document.getElementById('u-identificacion').value = item.identificacion;
+        document.getElementById('u-sede').value = item.sede;
+
+        document.querySelectorAll('input[name="roles_usuario"]').forEach(cb => {
+            cb.checked = item.roles.includes(cb.value);
+        });
+    }
+
+    document.getElementById('form-usuario').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const roles = Array.from(document.querySelectorAll('input[name="roles_usuario"]:checked')).map(cb => cb.value);
+        if(!roles.length) return alert("Selecciona al menos un rol.");
+
+        const btn = document.getElementById('btn-save-user');
+        btn.disabled = true; btn.innerText = "Procesando...";
+
+        fetch("{% url 'api_gestion_usuario' %}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
+            body: JSON.stringify({
+                id: document.getElementById('user-id').value,
+                username: document.getElementById('u-username').value,
+                first_name: document.getElementById('u-fname').value,
+                last_name: document.getElementById('u-lname').value,
+                identificacion: document.getElementById('u-identificacion').value,
+                ubicacion_id: document.getElementById('u-sede').value,
+                password: document.getElementById('u-pass').value,
+                roles: roles
+            })
+        })
+        .then(res => res.json())
+        .then(data => data.status === 'success' ? location.reload() : alert(data.mensaje))
+        .finally(() => btn.disabled = false);
+    });
+</script>

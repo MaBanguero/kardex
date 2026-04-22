@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-8 animate-fade-in">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 tracking-tight">Panel de Control Administrativo</h1>
+            <p class="text-slate-500 font-medium">Sede Operativa: <span class="text-blue-600 font-bold">{{ ubicacion.nombre }}</span></p>
+        </div>
+        <div class="px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sesión: {{ request.user.username }}</p>
+            <div class="flex gap-1 mt-1">
+                {% for g in request.user.groups.all %}
+                <span class="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">{{ g.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="flex space-x-1 bg-slate-200/50 p-1.5 rounded-2xl mb-8 max-w-2xl shadow-inner">
+    <button onclick="switchAdminTab('productos')" id="tab-btn-productos" class="flex-1 py-3 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200">
+        <i class="fas fa-boxes mr-2"></i>Inventario
+    </button>
+
+    {% if es_admin %}
+    <button onclick="switchAdminTab('usuarios')" id="tab-btn-usuarios" class="flex-1 py-3 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200">
+        <i class="fas fa-users-cog mr-2"></i>Personal
+    </button>
+    {% endif %}
+
+    <button onclick="switchAdminTab('logistica')" id="tab-btn-logistica" class="flex-1 py-3 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200">
+        <i class="fas fa-truck-loading mr-2"></i>Logística
+    </button>
+</div>
+
+<div id="admin-vista-productos" class="block animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+        <div class="relative w-full md:w-96">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="admin-busqueda" oninput="filtrarAdminTable()" class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 transition" placeholder="Buscar medicamento o lote...">
+        </div>
+        <button onclick="abrirModalProducto()" class="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-blue-600 transition shadow-lg flex items-center justify-center gap-2">
+            <i class="fas fa-plus-circle"></i> Nuevo Producto
+        </button>
+    </div>
+
+    <div id="contenedor-alertas-stock" class="mb-6 space-y-3"></div>
+
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                    <tr>
+                        <th class="px-6 py-4">Medicamento</th>
+                        <th class="px-6 py-4">Lote / Vence</th>
+                        <th class="px-6 py-4 text-center">Stock Actual</th>
+                        <th class="px-6 py-4 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-table-body" class="divide-y divide-slate-50">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if es_admin %}
+<div id="admin-vista-usuarios" class="hidden animate-fade-in">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-black text-slate-800">Gestión de Colaboradores</h3>
+        <button onclick="abrirModalUsuario()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-600 transition flex items-center gap-2">
+            <i class="fas fa-user-plus"></i> Registrar Usuario
+        </button>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                <tr>
+                    <th class="px-6 py-4">Nombre / ID</th>
+                    <th class="px-6 py-4">Roles Activos</th>
+                    <th class="px-6 py-4">Sede Asignada</th>
+                    <th class="px-6 py-4 text-right">Gestionar</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for u in usuarios %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-6 py-4">
+                        <p class="font-bold text-slate-800">{{ u.get_full_name|default:u.username }}</p>
+                        <p class="text-[10px] font-mono text-slate-400 font-bold">{{ u.perfil.numero_identificacion }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap gap-1">
+                            {% for grupo in u.groups.all %}
+                            <span class="px-2 py-1 rounded-md text-[9px] font-black uppercase bg-blue-50 text-blue-600 border border-blue-100">
+                                {{ grupo.name }}
+                            </span>
+                            {% empty %}
+                            <span class="text-[10px] text-slate-400 italic">Sin grupos</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-bold text-slate-600">
+                        {{ u.perfil.ubicacion_asignada.nombre }}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="editarUsuario({
+                            id: '{{ u.id }}',
+                            username: '{{ u.username }}',
+                            fname: '{{ u.first_name }}',
+                            lname: '{{ u.last_name }}',
+                            email: '{{ u.email }}',
+                            identificacion: '{{ u.perfil.numero_identificacion }}',
+                            sede: '{{ u.perfil.ubicacion_asignada.id|default:'' }}',
+                            roles: [{% for g in u.groups.all %}'{{ g.name }}'{% if not forloop.last %},{% endif %}{% endfor %}]
+                        })" class="text-slate-300 hover:text-blue-600 transition p-2">
+                            <i class="fas fa-user-edit text-lg"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div id="admin-vista-logistica" class="hidden animate-fade-in">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        {% if es_admin %}
+            {% include "kardex/components/admin_csv_card.html" %}
+        {% endif %}
+
+        {% if es_admin or es_regente %}
+            {% include "kardex/components/admin_request_card.html" %}
+        {% endif %}
+
+    </div>
+</div>
+
+{% include "kardex/components/modal_producto.html" %}
+{% include "kardex/components/modal_usuario.html" %}
+
+<script>
+    // 1. Manejo de Navegación por Pestañas
+    function switchAdminTab(target) {
+        const sections = ['productos', 'usuarios', 'logistica'];
+        sections.forEach(s => {
+            const el = document.getElementById(`admin-vista-${s}`);
+            const btn = document.getElementById(`tab-btn-${s}`);
+            if(el) el.classList.toggle('hidden', s !== target);
+            if(btn) btn.className = s === target
+                ? "flex-1 py-3 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200"
+                : "flex-1 py-3 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
+        });
+        if(target === 'productos') cargarTablaAdmin();
+    }
+
+    // 2. Sincronización y Renderizado de Inventario
+    function cargarTablaAdmin() {
+        fetch("{% url 'sincronizar_inventario_api' %}")
+            .then(res => res.json())
+            .then(data => {
+                window.adminCache = data.inventario;
+                renderAdminTable(data.inventario);
+            });
+    }
+
+    function renderAdminTable(items) {
+        const body = document.getElementById('admin-table-body');
+        const alertasContainer = document.getElementById('contenedor-alertas-stock');
+        let htmlAlertas = '';
+
+        if(!items.length) {
+            body.innerHTML = '<tr><td colspan="4" class="p-12 text-center text-slate-400 italic">No hay productos registrados en esta sede.</td></tr>';
+            alertasContainer.innerHTML = '';
+            return;
+        }
+
+        body.innerHTML = items.map(i => {
+            const esCritico = i.cantidad_actual <= i.stock_minimo;
+            const requierePedido = esCritico && !i.en_tramite;
+
+            // Generar Alerta Roja Gigante si corresponde
+            if(requierePedido) {
+                htmlAlertas += `
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex flex-col md:flex-row md:justify-between md:items-center gap-4 animate-fade-in">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl shadow-inner">
+                                <i class="fas fa-exclamation-triangle animate-pulse"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-red-800 font-black text-lg">¡Stock Crítico Detectado!</h4>
+                                <p class="text-red-600 font-medium text-sm"><b>${i.principio_activo}</b> tiene solo <span class="font-black text-lg">${i.cantidad_actual}</span> uds. (Mínimo: ${i.stock_minimo}).</p>
+                            </div>
+                        </div>
+                        <button onclick="enviarSolicitudRapida('${i.medicamento_id}', 50)" class="w-full md:w-auto bg-red-600 text-white px-6 py-3 rounded-xl font-black shadow-lg shadow-red-600/30 hover:bg-red-700 transition active:scale-95 flex items-center justify-center gap-2">
+                            <i class="fas fa-truck-medical text-xl"></i> SOLICITAR A CENTRAL
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Definir estilos de la fila y el número
+            let colorClase = 'text-slate-700 bg-slate-50 border-slate-100';
+            if (requierePedido) colorClase = 'text-red-600 bg-red-50 border-red-200';
+            else if (esCritico && i.en_tramite) colorClase = 'text-amber-500 bg-amber-50 border-amber-200';
+
+            return `
+                <tr class="hover:bg-slate-50 transition ${requierePedido ? 'bg-red-50/10' : ''}">
+                    <td class="px-6 py-5">
+                        <p class="font-bold text-slate-800">${i.principio_activo}</p>
+                        <p class="text-[10px] text-slate-400 uppercase font-black">${i.forma_farmaceutica} ${i.concentracion || ''}</p>
+                    </td>
+                    <td class="px-6 py-5">
+                        <span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-100">${i.lote}</span>
+                        <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase"><i class="far fa-calendar-times mr-1 opacity-50"></i>${i.fecha_vencimiento}</p>
+                    </td>
+                    <td class="px-6 py-5 text-center">
+                        <div class="inline-flex flex-col items-center">
+                            <span class="font-black text-2xl ${colorClase} px-4 py-1 rounded-xl border">
+                                ${i.cantidad_actual}
+                            </span>
+                            <span class="text-[9px] font-bold text-slate-400 mt-1 uppercase">Mínimo: ${i.stock_minimo}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-5 text-right">
+                        ${i.en_tramite ? `
+                            <span class="inline-flex items-center gap-1 text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 mr-2">
+                                <i class="fas fa-clock fa-spin"></i> Pedido en Curso
+                            </span>
+                        ` : ''}
+                        <button onclick='editarProducto(${JSON.stringify(i)})' class="text-slate-300 hover:text-blue-600 transition p-2">
+                            <i class="fas fa-edit text-lg"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        alertasContainer.innerHTML = htmlAlertas;
+    }
+
+    // 3. Crear solicitud rápida desde Alerta Roja
+    function enviarSolicitudRapida(medicamento_id, cantidad) {
+        if(!confirm('¿Enviar solicitud de abastecimiento urgente a la bodega central?')) return;
+
+        fetch("{% url 'api_crear_solicitud' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ medicamento_id: medicamento_id, cantidad: cantidad })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') cargarTablaAdmin();
+            else alert("Error: " + data.mensaje);
+        });
+    }
+
+    // 4. Filtro Local de Búsqueda
+    function filtrarAdminTable() {
+        const query = document.getElementById('admin-busqueda').value.toLowerCase();
+        renderAdminTable(window.adminCache.filter(i => i.busqueda.includes(query)));
+    }
+
+    // Inicializar al cargar
+    document.addEventListener('DOMContentLoaded', () => cargarTablaAdmin());
+
+    // Función para despachar el pedido con 1 clic
+function cambiarEstadoSolicitud(solicitudId) {
+    // 1. Confirmación de seguridad
+    if(!confirm('¿Confirmas el despacho de esta solicitud? Se sumará la cantidad automáticamente al inventario de la sede destino.')) {
+        return;
+    }
+
+    // 2. Enviamos la orden a Django
+    fetch("{% url 'api_atender_solicitud' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}' // Permiso de seguridad
+        },
+        body: JSON.stringify({ solicitud_id: solicitudId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'success') {
+            // Si todo salió bien, recargamos la pantalla para actualizar todo
+            alert("✅ " + data.mensaje);
+            location.reload();
+        } else {
+            // Si hubo un error (ej: el Regente no tiene ese medicamento creado)
+            alert("❌ Error: " + data.mensaje);
+        }
+    })
+    .catch(error => {
+        alert("❌ Error de red al intentar procesar la solicitud.");
+    });
+}
+</script>
+{% endblock %}

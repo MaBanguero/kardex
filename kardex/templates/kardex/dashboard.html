@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% include "kardex/components/tabs.html" %}
+
+    {% include "kardex/components/vista_inventario.html" %}
+    {% include "kardex/components/vista_historial.html" %}
+
+    {% include "kardex/components/modal_movimiento.html" %}
+
+    {% include "kardex/components/scripts_spa.html" %}
+
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    </style>
+{% endblock %}

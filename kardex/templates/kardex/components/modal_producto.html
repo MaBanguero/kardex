@@ -1,0 +1,153 @@
+<div id="modal-producto-container" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden my-8 transform transition-all scale-95 opacity-0 duration-300" id="modal-producto-box">
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
+            <h3 id="modal-titulo" class="font-black text-slate-800 text-lg">Gestionar Registro</h3>
+            <button onclick="cerrarModalProducto()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
+
+        <form id="form-producto" class="p-8">
+            {% csrf_token %}
+            <input type="hidden" id="prod-id">
+
+            <div class="mb-8">
+                <h4 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-notes-medical"></i> Información del Medicamento
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo *</label>
+                        <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
+                        <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
+                        <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Concentración</label>
+                        <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
+                        <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio Fabricante</label>
+                        <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <h4 class="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-boxes"></i> Información de Lote e Inventario
+                </h4>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Lote Físico *</label>
+                        <input type="text" id="prod-lote" required class="w-full bg-white border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none font-mono uppercase text-slate-800">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Vencimiento *</label>
+                        <input type="date" id="prod-vence" required class="w-full bg-white border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-slate-800">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Cantidad Total *</label>
+                        <input type="number" id="prod-cantidad" required min="0" class="w-full bg-white border border-emerald-300 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/20 outline-none font-black text-xl text-slate-800 text-center shadow-sm">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Límite
+                            Mínimo (Alerta)</label>
+                        <input type="number" id="p-stock-minimo" value="10" required
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-amber-500/10 outline-none font-bold text-amber-600"
+                               placeholder="Ej: 10">
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button type="submit" id="btn-save-prod" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-600 shadow-lg shadow-slate-900/20 transition-all active:scale-95">
+                    Guardar Registro en Sistema
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Actualizamos el Javascript para capturar los nuevos campos
+    const mCont = document.getElementById('modal-producto-container');
+    const mBox = document.getElementById('modal-producto-box');
+
+    function abrirModalProducto() {
+        document.getElementById('form-producto').reset();
+        document.getElementById('prod-id').value = "";
+        document.getElementById('modal-titulo').innerText = "Nuevo Ingreso a Inventario";
+        mCont.classList.replace('hidden', 'flex');
+        setTimeout(() => mBox.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+
+    function editarProducto(item) {
+        abrirModalProducto();
+        document.getElementById('modal-titulo').innerText = "Editar Registro: Lote " + item.lote;
+
+        // Mapeo de datos (Asegúrate de que la API de sincronización devuelva estos campos nuevos)
+        document.getElementById('prod-id').value = item.id;
+        document.getElementById('prod-nombre').value = item.principio_activo || "";
+        document.getElementById('prod-codigo').value = item.codigo || "";
+        document.getElementById('prod-forma').value = item.forma_farmaceutica || "";
+        document.getElementById('prod-concentracion').value = item.concentracion || "";
+        document.getElementById('prod-presentacion').value = item.presentacion || "";
+        document.getElementById('prod-laboratorio').value = item.laboratorio || "";
+
+        document.getElementById('prod-lote').value = item.lote || "";
+        document.getElementById('prod-cantidad').value = item.cantidad_actual || 0;
+
+        if(item.fecha_vencimiento) {
+            const parts = item.fecha_vencimiento.split('/');
+            if(parts.length === 3) document.getElementById('prod-vence').value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+    }
+
+    function cerrarModalProducto() {
+        mBox.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => mCont.classList.replace('flex', 'hidden'), 300);
+    }
+
+    document.getElementById('form-producto').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save-prod');
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+        const payload = {
+            id: document.getElementById('prod-id').value,
+            principio_activo: document.getElementById('prod-nombre').value,
+            codigo: document.getElementById('prod-codigo').value,
+            forma_farmaceutica: document.getElementById('prod-forma').value,
+            concentracion: document.getElementById('prod-concentracion').value,
+            presentacion: document.getElementById('prod-presentacion').value,
+            laboratorio: document.getElementById('prod-laboratorio').value,
+            lote: document.getElementById('prod-lote').value,
+            fecha_vencimiento: document.getElementById('prod-vence').value,
+            cantidad: document.getElementById('prod-cantidad').value
+        };
+
+        fetch("{% url 'api_gestion_producto' %}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                cerrarModalProducto();
+                cargarTablaAdmin();
+                localStorage.removeItem('kardex_data_{{ ubicacion.id }}');
+            } else { alert("Error: " + data.mensaje); }
+        })
+        .finally(() => { btn.disabled = false; btn.innerText = "Guardar Registro en Sistema"; });
+    });
+</script>

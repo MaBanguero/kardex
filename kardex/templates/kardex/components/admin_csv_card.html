@@ -1,0 +1,96 @@
+<div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in h-full flex flex-col">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fas fa-file-csv"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Carga Masiva</h3>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Formato Estándar .CSV</p>
+            </div>
+        </div>
+        <button onclick="descargarPlantillaCSV()" class="text-[10px] font-black uppercase bg-slate-100 text-slate-500 px-3 py-2 rounded-lg hover:bg-emerald-500 hover:text-white transition flex items-center gap-2">
+            <i class="fas fa-download"></i> Plantilla
+        </button>
+    </div>
+
+    <form id="form-carga-masiva" class="space-y-6 flex-1 flex flex-col">
+        {% csrf_token %}
+
+        <div class="border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl p-8 text-center hover:border-emerald-400 hover:bg-emerald-50/50 transition-all cursor-pointer group flex-1 flex flex-col justify-center" onclick="document.getElementById('archivo_csv').click()">
+            <input type="file" id="archivo_csv" accept=".csv" class="hidden">
+            <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                <i class="fas fa-cloud-upload-alt text-2xl text-slate-300 group-hover:text-emerald-500"></i>
+            </div>
+            <p id="file-name-display" class="text-sm font-bold text-slate-500">Selecciona o arrastra el archivo</p>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-100 p-3 rounded-xl">
+            <p class="text-[9px] text-amber-700 font-bold leading-tight">
+                <i class="fas fa-info-circle mr-1"></i> Asegúrate de que las fechas tengan el formato <span class="underline">AAAA-MM-DD</span> y no dejar columnas obligatorias vacías.
+            </p>
+        </div>
+
+        <button type="submit" id="btn-upload-csv" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-emerald-600 shadow-lg transition-all active:scale-95 disabled:opacity-50">
+            Procesar Carga
+        </button>
+    </form>
+</div>
+
+<script>
+    // Generador de plantilla dinámica
+    function descargarPlantillaCSV() {
+        const encabezados = ["principio_activo", "forma_farmaceutica", "concentracion", "lote", "fecha_vencimiento", "cantidad", "stock_minimo", "presentacion", "laboratorio", "codigo"];
+        const ejemplo = ["ACETAMINOFEN", "TABLETA", "500MG", "LOTE123", "2026-12-31", "100", "20", "CAJA X 10", "GENFAR", "770123456"];
+
+        const contenidoCsv = encabezados.join(",") + "\n" + ejemplo.join(",");
+        const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "plantilla_inventario_kardex.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Lógica de UI para el archivo
+    const fileInput = document.getElementById('archivo_csv');
+    const display = document.getElementById('file-name-display');
+
+    fileInput.addEventListener('change', (e) => {
+        if(e.target.files.length > 0) {
+            display.innerText = e.target.files[0].name;
+            display.classList.add('text-emerald-600');
+        }
+    });
+
+    document.getElementById('form-carga-masiva').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (fileInput.files.length === 0) return alert("Selecciona un archivo.");
+
+        const btn = document.getElementById('btn-upload-csv');
+        const formData = new FormData();
+        formData.append('archivo', fileInput.files[0]);
+
+        btn.disabled = true;
+        btn.innerText = "Cargando...";
+
+        fetch("{% url 'api_carga_masiva' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.status === 'success' ? "✅ " + data.mensaje : "❌ " + data.mensaje);
+            if(data.status === 'success') location.reload();
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = "Procesar Carga";
+        });
+    });
+</script>

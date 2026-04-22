@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kardex Farmacia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <header class="md:hidden bg-blue-800 text-white p-4 flex justify-between items-center shadow-md">
+        <span class="font-bold text-lg tracking-tight">KARDEX</span>
+        <button onclick="toggleSidebar()" class="text-2xl p-2"><i class="fas fa-bars"></i></button>
+    </header>
+    <div class="flex h-screen overflow-hidden">
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 transform -translate-x-full md:translate-x-0 md:relative transition-transform duration-300 ease-in-out">
+            <div class="p-6">
+                <h1 class="text-white text-xl font-bold flex items-center gap-3">
+                    <i class="fas fa-hospital-user text-blue-500"></i> Gestión Farmacia
+                </h1>
+            </div>
+            <nav class="mt-4 px-4 space-y-2">
+                <a href="#" class="flex items-center gap-3 p-3 rounded-xl bg-blue-600 text-white shadow-lg">
+                    <i class="fas fa-desktop"></i> Panel Principal
+                </a>
+                <a href="{% url 'exportar_excel' %}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800 transition">
+                    <i class="fas fa-file-excel text-green-500"></i> Reporte Mensual
+                </a>
+                <div class="mt-10 pt-10 border-t border-slate-800">
+                    <div class="px-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-blue-400 font-bold border border-slate-600">
+                            {{ request.user.username|slice:":1"|upper }}
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-sm font-semibold text-white truncate">{{ request.user.get_full_name|default:request.user.username }}</p>
+                            <p class="text-xs text-slate-500">{{ request.user.perfil.get_rol_display }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-auto pt-6 border-t border-slate-100">
+                    <form method="POST" action="{% url 'logout' %}" class="w-full">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="group w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all duration-200">
+                            <div class="w-10 h-10 bg-slate-100 group-hover:bg-red-100 group-hover:text-red-600 rounded-xl flex items-center justify-center transition-colors">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </div>
+                            <span class="font-bold text-sm">Cerrar Sesión</span>
+                        </button>
+                    </form>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            <div class="p-4 md:p-8 max-w-7xl mx-auto">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        }
+    </script>
+</body>
+</html>

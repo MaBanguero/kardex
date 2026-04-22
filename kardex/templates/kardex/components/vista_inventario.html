@@ -1,0 +1,35 @@
+<div id="vista-inventario" class="block animate-fade-in">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-2xl font-black text-slate-800 tracking-tight">Kardex Digital</h2>
+            <p class="text-slate-500 font-medium text-sm">Sede: <span class="text-blue-600 font-bold">{{ ubicacion.nombre }}</span></p>
+        </div>
+
+        <div class="relative w-full md:w-96 group">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <i class="fas fa-search text-slate-400 group-focus-within:text-blue-500 transition-colors"></i>
+            </div>
+            <input type="text" id="buscador-kardex" autocomplete="off"
+                   class="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm font-medium text-slate-700"
+                   placeholder="Buscar principio activo o lote...">
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden min-h-[450px]">
+        <div id="contenedor-movil" class="md:hidden divide-y divide-slate-100"></div>
+
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50/50 text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-100">
+                    <tr>
+                        <th class="px-6 py-5">Medicamento</th>
+                        <th class="px-6 py-4">Lote / Vencimiento</th>
+                        <th class="px-6 py-4 text-center">Stock</th>
+                        <th class="px-6 py-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="contenedor-escritorio" class="divide-y divide-slate-50"></tbody>
+            </table>
+        </div>
+    </div>
+</div>

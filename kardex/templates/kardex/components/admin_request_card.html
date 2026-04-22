@@ -1,0 +1,67 @@
+<div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in flex flex-col h-full">
+    <div class="flex items-center gap-4 mb-6">
+        <div class="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center text-xl">
+            <i class="fas fa-boxes"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-800 text-lg">Solicitudes de Stock</h3>
+            <p class="text-xs text-slate-400 font-medium">Gestiona los pedidos de la sede</p>
+        </div>
+    </div>
+
+    <form id="form-nueva-solicitud" class="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Crear Nuevo Pedido</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="col-span-2">
+                <select id="req-medicamento" required class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-slate-700">
+                    <option value="" disabled selected>Seleccione el medicamento...</option>
+                    {% for med in medicamentos %}
+                        <option value="{{ med.id }}">{{ med.principio_activo }} {{ med.concentracion|default:"" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <input type="number" id="req-cantidad" placeholder="Cant." min="1" required class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-center">
+            </div>
+        </div>
+        <button type="submit" class="w-full mt-4 bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition shadow-md shadow-amber-500/20 text-sm">
+            Enviar Solicitud a Central
+        </button>
+    </form>
+
+    <div class="flex-1 overflow-y-auto pr-2">
+        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b pb-2">Historial de Pedidos</h4>
+
+        <div class="space-y-3">
+            {% for req in solicitudes %}
+            <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:shadow-md transition group">
+                <div>
+                    <p class="font-bold text-slate-800 text-sm">{{ req.medicamento.principio_activo }}</p>
+                    <p class="text-[10px] text-slate-400 mt-1">
+                        <span class="font-black text-slate-600">Cant: {{ req.cantidad_pedida }}</span> •
+                        {% if es_admin %} Sede: {{ req.sede_solicitante.nombre }} {% else %} {{ req.fecha_solicitud|date:"d/m/Y" }} {% endif %}
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    {% if req.estado == 'PENDIENTE' %}
+                        <span class="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black uppercase rounded-lg border border-amber-100">Pendiente</span>
+                    {% else %}
+                        <span class="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg border border-emerald-100">Solicitado</span>
+                    {% endif %}
+
+                    {% if es_admin and req.estado == 'PENDIENTE' %}
+                    <button onclick="cambiarEstadoSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-emerald-500 transition tooltip" title="Marcar como Solicitado/Despachado">
+                        <i class="fas fa-check-circle text-xl"></i>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center p-6 text-slate-400 italic text-sm border-2 border-dashed border-slate-100 rounded-xl">
+                No hay solicitudes registradas en esta sede.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
