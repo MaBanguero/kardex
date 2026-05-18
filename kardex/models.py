@@ -62,13 +62,25 @@ class Ubicacion(models.Model):
 
 
 class Medicamento(models.Model):
+    TIPOS = (
+        ('MEDICAMENTO', 'Medicamento'),
+        ('DISPOSITIVO', 'Dispositivo Médico'),
+    )
+
+    tipo = models.CharField(max_length=20, choices=TIPOS, default='MEDICAMENTO')
     codigo = models.CharField(max_length=50, unique=True, null=True, blank=True, help_text="Código ATC, CUM o interno")
-    principio_activo = models.CharField(max_length=150)
+    principio_activo = models.CharField(max_length=150, verbose_name="Nombre / Principio Activo")
     concentracion = models.CharField(max_length=100, null=True, blank=True, help_text="Ej: 500mg, 0.3%, 1g")
     forma_farmaceutica = models.CharField(max_length=100, help_text="Ej: Tableta, Solución, Jarabe")
     presentacion = models.CharField(max_length=100, null=True, blank=True, help_text="Ej: Caja x 30, Frasco x 100ml")
     laboratorio = models.CharField(max_length=150, null=True, blank=True)
     registro_invima = models.CharField(max_length=100, null=True, blank=True)
+    vida_util = models.CharField(max_length=50, null=True, blank=True,
+                                 help_text="Ej: 5 años, 3 AÑOS, 1 año")
+    clasificacion_riesgo = models.CharField(max_length=10, null=True, blank=True,
+                                            choices=[('I', 'I - Bajo'), ('IIa', 'IIa - Medio'),
+                                                     ('IIb', 'IIb - Medio-Alto'), ('III', 'III - Alto')],
+                                            help_text="Clasificación de riesgo INVIMA: I, IIa, IIb, III")
 
     def __str__(self):
         conc = f" {self.concentracion}" if self.concentracion else ""

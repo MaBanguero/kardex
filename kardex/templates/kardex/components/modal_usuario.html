@@ -26,6 +26,11 @@
                 </div>
 
                 <div class="col-span-2">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Correo Electrónico</label>
+                    <input type="email" id="u-email" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="usuario@hospital.com">
+                </div>
+
+                <div class="col-span-2">
                     <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Cédula / Identificación</label>
                     <input type="text" id="u-identificacion" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono font-bold text-blue-700">
                 </div>
@@ -91,6 +96,7 @@
         document.getElementById('u-fname').value = item.fname;
         document.getElementById('u-lname').value = item.lname;
         document.getElementById('u-identificacion').value = item.identificacion;
+        document.getElementById('u-email').value = item.email || '';
         document.getElementById('u-sede').value = item.sede;
 
         document.querySelectorAll('input[name="roles_usuario"]').forEach(cb => {
@@ -106,6 +112,8 @@
         const btn = document.getElementById('btn-save-user');
         btn.disabled = true; btn.innerText = "Procesando...";
 
+        const passVal = document.getElementById('u-pass').value || '';
+
         fetch("{% url 'api_gestion_usuario' %}", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}" },
@@ -114,14 +122,15 @@
                 username: document.getElementById('u-username').value,
                 first_name: document.getElementById('u-fname').value,
                 last_name: document.getElementById('u-lname').value,
+                email: document.getElementById('u-email').value,
                 identificacion: document.getElementById('u-identificacion').value,
                 ubicacion_id: document.getElementById('u-sede').value,
-                password: document.getElementById('u-pass').value,
+                password: passVal,
                 roles: roles
             })
         })
         .then(res => res.json())
         .then(data => data.status === 'success' ? location.reload() : alert(data.mensaje))
-        .finally(() => btn.disabled = false);
+        .finally(() => { btn.disabled = false; btn.innerText = 'Guardar Cambios'; });
     });
 </script>

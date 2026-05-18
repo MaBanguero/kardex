@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from .models import Documento, ConfiguracionSistema, DocumentoDetalle, Medicamento, User, Ubicacion, SolicitudStock
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q as models_Q
 from django.utils import timezone
 from datetime import timedelta
 
@@ -91,10 +91,14 @@ def sincronizar_inventario_api(request):
             'principio_activo': item.medicamento.principio_activo,
             'forma_farmaceutica': item.medicamento.forma_farmaceutica,
             'concentracion': item.medicamento.concentracion,
+            'codigo': item.medicamento.codigo,
+            'presentacion': item.medicamento.presentacion,
+            'laboratorio': item.medicamento.laboratorio,
             'lote': item.lote,
             'fecha_vencimiento': item.fecha_vencimiento.strftime('%Y-%m-%d') if item.fecha_vencimiento else '',
             'cantidad_actual': item.cantidad_actual,
             'stock_minimo': item.stock_minimo,
+            'tipo': item.medicamento.tipo,
             'busqueda': f"{item.medicamento.principio_activo} {item.lote}".lower(),
             # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
             'en_tramite': item.medicamento.id in meds_pendientes
@@ -120,10 +124,16 @@ def registrar_movimiento_view(request):
             return JsonResponse({'status': 'success', 'requiere_sincronizacion': True})
 
         elif tipo == 'DEVOLUCION':
-            # Cambiamos doc_id por el nombre del medicamento para permitir devoluciones masivas
+            doc_id = data.get('doc_id')
             nombre_med = data.get('nombre_medicamento')
 
-            registrar_devolucion_agrupada(request.user, nombre_med, cantidad, id_paciente)
+            if doc_id:
+                # Devolución específica contra un documento de salida concreto
+                from .services import registrar_devolucion
+                registrar_devolucion(request.user, doc_id, cantidad)
+            else:
+                # Devolución agrupada: busca todas las salidas del paciente para este medicamento
+                registrar_devolucion_agrupada(request.user, nombre_med, cantidad, id_paciente)
 
             return JsonResponse({
                 'status': 'success',
@@ -140,21 +150,21 @@ def registrar_movimiento_view(request):
 @login_required
 def exportar_kardex_excel(request):
     """
-    Genera el formato Horizontal del Kardex leyendo todos los movimientos
-    del mes en curso, empaquetado usando OpenPyXL.
+    Genera el kárdex en formato Excel según el tipo:
+    - MEDICAMENTO → Formato PM-SF-FR12
+    - DISPOSITIVO → Formato PM-SF-FR11
     """
     hoy = datetime.datetime.now()
     ubicacion_id = request.user.perfil.ubicacion_asignada.id
+    tipo = request.GET.get('tipo', 'MEDICAMENTO')
 
-    # Llamamos a la lógica pesada que armamos en services.py
-    wb = generar_excel_kardex(hoy.month, hoy.year, ubicacion_id)
+    wb = generar_excel_kardex(hoy.month, hoy.year, ubicacion_id, tipo)
 
-    # Preparamos la respuesta HTTP para que el navegador descargue el archivo
+    tipo_label = 'Medicamentos' if tipo == 'MEDICAMENTO' else 'Dispositivos'
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    # Nombramos el archivo con la fecha actual
-    response['Content-Disposition'] = f'attachment; filename=Kardex_{hoy.strftime("%Y%m%d")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename=Kardex_{tipo_label}_{hoy.strftime("%Y%m%d")}.xlsx'
 
     wb.save(response)
     return response
@@ -256,7 +266,11 @@ def admin_dashboard_view(request):
         'roles': roles_disponibles,
         'solicitudes': solicitudes,
         'usuarios': User.objects.select_related('perfil').prefetch_related('groups').all(),
-        'medicamentos': Medicamento.objects.all()
+        'sedes_json': json.dumps(list(Ubicacion.objects.values('id', 'nombre', 'es_bodega_principal'))),
+        'medicamentos': Medicamento.objects.filter(
+            inventariostock__ubicacion=request.user.perfil.ubicacion_asignada
+        ).distinct().order_by('principio_activo'),
+        'tipos_medicamento': Medicamento.TIPOS,
     })
 
 
@@ -274,20 +288,35 @@ def api_gestion_producto(request):
         ubicacion_actual = request.user.perfil.ubicacion_asignada
 
         with transaction.atomic():
+            tipo_val = data.get('tipo', 'MEDICAMENTO')
+            if tipo_val not in ('MEDICAMENTO', 'DISPOSITIVO'):
+                tipo_val = 'MEDICAMENTO'
+
             medicamento, _ = Medicamento.objects.get_or_create(
                 principio_activo=data.get('principio_activo').strip().upper(),
-                forma_farmaceutica=data.get('forma_farmaceutica').strip().upper()
+                forma_farmaceutica=data.get('forma_farmaceutica', '').strip().upper()
             )
 
             # Control de nulos para campos únicos
             codigo_ingresado = data.get('codigo', '').strip()
             medicamento.codigo = codigo_ingresado if codigo_ingresado else None
+            medicamento.tipo = tipo_val
             medicamento.concentracion = data.get('concentracion', medicamento.concentracion)
             medicamento.presentacion = data.get('presentacion', medicamento.presentacion)
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
+            medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
+            medicamento.clasificacion_riesgo = data.get('clasificacion_riesgo', medicamento.clasificacion_riesgo)
             medicamento.save()
 
             lote_ingresado = data.get('lote').strip().upper()
+
+            # Validar que la fecha de vencimiento no sea pasada
+            fecha_venc = data.get('fecha_vencimiento')
+            if fecha_venc:
+                from datetime import date
+                fecha_venc_date = date.fromisoformat(fecha_venc) if isinstance(fecha_venc, str) else fecha_venc
+                if fecha_venc_date < date.today():
+                    raise ValueError("La fecha de vencimiento no puede ser anterior a la fecha actual.")
 
             # Validación de Integridad de Lotes
             if producto_id:
@@ -348,8 +377,7 @@ def api_carga_masiva(request):
         ubicacion_actual = request.user.perfil.ubicacion_asignada
 
         # 3. Procesamiento ACID
-        # Le pasamos el archivo y la sede a tu lógica de servicios
-        total_procesados = procesar_carga_masiva_productos(archivo_csv, ubicacion_actual)
+        total_procesados = procesar_carga_masiva_productos(request.user, archivo_csv)
 
         return JsonResponse({
             'status': 'success',
@@ -378,15 +406,32 @@ def api_gestion_usuario(request):
         data = json.loads(request.body)
         user_id = data.get('id')
         roles_seleccionados = data.get('roles', [])
+        identificacion = data.get('identificacion', '').strip()
+
+        # Validar unicidad de identificación
+        if identificacion:
+            duplicado = PerfilUsuario.objects.filter(
+                numero_identificacion=identificacion
+            )
+            if user_id:
+                duplicado = duplicado.exclude(usuario_id=user_id)
+            if duplicado.exists():
+                return JsonResponse({
+                    'status': 'error',
+                    'mensaje': f'Ya existe un usuario con la identificación "{identificacion}".'
+                }, status=400)
 
         with transaction.atomic():
             if user_id:
                 user = User.objects.get(id=user_id)
                 user.first_name = data.get('first_name')
                 user.last_name = data.get('last_name')
-                user.email = data.get('email')
-                if data.get('password'):
-                    user.set_password(data.get('password'))
+                # Bug 10: Solo actualizar email si se envió un valor no vacío
+                if data.get('email'):
+                    user.email = data.get('email')
+                raw_password = data.get('password', '')
+                if raw_password and raw_password.strip():
+                    user.set_password(raw_password)
                 user.save()
 
                 perfil = user.perfil
@@ -396,10 +441,10 @@ def api_gestion_usuario(request):
             else:
                 user = User.objects.create_user(
                     username=data.get('username'),
-                    password=data.get('password'),
+                    password=data.get('password') or 'changeme123',
                     first_name=data.get('first_name'),
                     last_name=data.get('last_name'),
-                    email=data.get('email')
+                    email=data.get('email', '')
                 )
                 PerfilUsuario.objects.create(
                     usuario=user,
@@ -458,28 +503,76 @@ def api_atender_solicitud(request):
             if solicitud.estado != 'PENDIENTE':
                 raise ValueError("Esta solicitud ya fue atendida y despachada anteriormente.")
 
-            # 1. ACTUALIZAR EL INVENTARIO DE LA SEDE
-            # Buscamos el registro de stock de ese medicamento en esa sede específica
+            # 1. VERIFICAR QUE LA BODEGA CENTRAL TENGA STOCK
+            bodega_central = Ubicacion.objects.filter(es_bodega_principal=True).first()
+            if bodega_central:
+                stock_origen = InventarioStock.objects.filter(
+                    ubicacion=bodega_central,
+                    medicamento=solicitud.medicamento
+                ).select_for_update().first()
+
+                total_stock_origen = InventarioStock.objects.filter(
+                    ubicacion=bodega_central,
+                    medicamento=solicitud.medicamento
+                ).aggregate(total=Sum('cantidad_actual'))['total'] or 0
+
+                if total_stock_origen < solicitud.cantidad_pedida:
+                    raise ValueError(
+                        f"Stock insuficiente en bodega central. Disponible: {total_stock_origen}, Solicitado: {solicitud.cantidad_pedida}")
+
+                # Descontar de la bodega central (FEFO)
+                cantidad_restante = solicitud.cantidad_pedida
+                stocks_origen = InventarioStock.objects.filter(
+                    ubicacion=bodega_central,
+                    medicamento=solicitud.medicamento,
+                    cantidad_actual__gt=0
+                ).select_for_update().order_by('fecha_vencimiento')
+
+                for s in stocks_origen:
+                    if cantidad_restante <= 0:
+                        break
+                    a_descontar = min(s.cantidad_actual, cantidad_restante)
+                    s.cantidad_actual -= a_descontar
+                    s.save()
+                    cantidad_restante -= a_descontar
+
+            # 2. ACTUALIZAR EL INVENTARIO DE LA SEDE
             stock = InventarioStock.objects.filter(
                 medicamento=solicitud.medicamento,
                 ubicacion=solicitud.sede_solicitante
-            ).order_by('-fecha_vencimiento').first()  # Tomamos el lote activo
+            ).order_by('-fecha_vencimiento').first()
 
             if stock:
-                # Si ya existía, le sumamos la cantidad que pidió el regente
                 stock.cantidad_actual += solicitud.cantidad_pedida
                 stock.save()
+                lote_destino = stock.lote
             else:
-                # Si el medicamento nunca había estado en esa sede, lo creamos
                 InventarioStock.objects.create(
                     ubicacion=solicitud.sede_solicitante,
                     medicamento=solicitud.medicamento,
-                    lote='ASIGNADO-CENTRAL',  # Lote genérico si no existía antes
+                    lote='ASIGNADO-CENTRAL',
+                    fecha_vencimiento=timezone.now().date() + timedelta(days=365),
                     cantidad_actual=solicitud.cantidad_pedida,
                     stock_minimo=10
                 )
+                lote_destino = 'ASIGNADO-CENTRAL'
 
-            # 2. ACTUALIZAR EL ESTADO DEL PEDIDO
+            # 3. CREAR DOCUMENTO CONTABLE
+            doc = Documento.objects.create(
+                tipo_mov='ENTRADA',
+                usuario=request.user,
+                destino=solicitud.sede_solicitante,
+                origen=bodega_central,
+                id_paciente=f"SOL-{solicitud.id}"
+            )
+            DocumentoDetalle.objects.create(
+                documento=doc,
+                medicamento=solicitud.medicamento,
+                lote=lote_destino,
+                cantidad=solicitud.cantidad_pedida
+            )
+
+            # 4. ACTUALIZAR EL ESTADO DEL PEDIDO
             solicitud.estado = 'SOLICITADO'
             solicitud.save()
 
@@ -491,3 +584,256 @@ def api_atender_solicitud(request):
         return JsonResponse({'status': 'error', 'mensaje': str(ve)}, status=400)
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': f'Error interno: {str(e)}'}, status=500)
+
+
+# ==============================================================================
+# CRUD Ubicacion
+# ==============================================================================
+@login_required
+@require_POST
+def api_gestion_ubicacion(request):
+    """Crea, edita o elimina una ubicación (solo ADMIN)"""
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        accion = data.get('accion', 'guardar')
+        ubicacion_id = data.get('id')
+
+        if accion == 'eliminar':
+            ubi = Ubicacion.objects.get(id=ubicacion_id)
+            # Verificar que no tenga stock ni usuarios asociados
+            if InventarioStock.objects.filter(ubicacion=ubi).exists():
+                return JsonResponse({'status': 'error', 'mensaje': 'No se puede eliminar: la ubicación tiene inventario asociado.'}, status=400)
+            if PerfilUsuario.objects.filter(ubicacion_asignada=ubi).exists():
+                return JsonResponse({'status': 'error', 'mensaje': 'No se puede eliminar: la ubicación tiene personal asignado.'}, status=400)
+            if SolicitudStock.objects.filter(sede_solicitante=ubi).exists():
+                return JsonResponse({'status': 'error', 'mensaje': 'No se puede eliminar: la ubicación tiene solicitudes asociadas.'}, status=400)
+            ubi.delete()
+            return JsonResponse({'status': 'success', 'mensaje': 'Ubicación eliminada correctamente.'})
+
+        nombre = data.get('nombre', '').strip()
+        if not nombre:
+            return JsonResponse({'status': 'error', 'mensaje': 'El nombre es obligatorio.'}, status=400)
+
+        es_principal = data.get('es_bodega_principal', False)
+
+        if ubicacion_id:
+            ubi = Ubicacion.objects.get(id=ubicacion_id)
+            ubi.nombre = nombre
+            if es_principal:
+                # Solo una bodega principal
+                Ubicacion.objects.filter(es_bodega_principal=True).exclude(id=ubi.id).update(es_bodega_principal=False)
+            ubi.es_bodega_principal = es_principal
+            ubi.save()
+        else:
+            if es_principal:
+                Ubicacion.objects.filter(es_bodega_principal=True).update(es_bodega_principal=False)
+            Ubicacion.objects.create(nombre=nombre, es_bodega_principal=es_principal)
+
+        return JsonResponse({'status': 'success'})
+
+    except Ubicacion.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Ubicación no encontrada.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# CRUD ConfiguracionSistema
+# ==============================================================================
+@login_required
+@require_POST
+def api_gestion_configuracion(request):
+    """Obtiene o actualiza la configuración del sistema (solo ADMIN)"""
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        accion = data.get('accion', 'guardar')
+
+        if accion == 'obtener':
+            config = ConfiguracionSistema.objects.first()
+            if not config:
+                config = ConfiguracionSistema.objects.create(horas_limite_devolucion=2)
+            return JsonResponse({
+                'status': 'success',
+                'config': {
+                    'id': config.id,
+                    'horas_limite_devolucion': config.horas_limite_devolucion
+                }
+            })
+
+        # Guardar
+        config = ConfiguracionSistema.objects.first()
+        if not config:
+            config = ConfiguracionSistema(horas_limite_devolucion=2)
+
+        horas = int(data.get('horas_limite_devolucion', 2))
+        if horas < 1:
+            return JsonResponse({'status': 'error', 'mensaje': 'Las horas deben ser al menos 1.'}, status=400)
+        config.horas_limite_devolucion = horas
+        config.save()
+
+        return JsonResponse({'status': 'success', 'mensaje': 'Configuración actualizada.'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# CRUD Documentos (visor de movimientos)
+# ==============================================================================
+@login_required
+def api_listar_movimientos(request):
+    """Lista todos los movimientos del sistema (admin) o de la sede (regente)"""
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    es_admin = 'ADMIN' in grupos_usuario
+    es_regente = 'REGENTE' in grupos_usuario
+
+    if not (es_admin or es_regente):
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        movimientos = Documento.objects.select_related('usuario', 'origen', 'destino')\
+            .prefetch_related('detalles__medicamento').order_by('-fecha')
+
+        if es_regente:
+            # Filtrar por sede del regente
+            ubi = request.user.perfil.ubicacion_asignada
+            movimientos = movimientos.filter(
+                models_Q(origen=ubi) | models_Q(destino=ubi)
+            )
+
+        data = []
+        for mov in movimientos:
+            detalles = []
+            for det in mov.detalles.all():
+                detalles.append({
+                    'medicamento': str(det.medicamento),
+                    'lote': det.lote,
+                    'cantidad': det.cantidad
+                })
+            data.append({
+                'id': mov.id,
+                'tipo_mov': mov.tipo_mov,
+                'fecha': mov.fecha.strftime('%Y-%m-%d %H:%M'),
+                'usuario': mov.usuario.get_full_name() or mov.usuario.username,
+                'origen': str(mov.origen) if mov.origen else '-',
+                'destino': str(mov.destino) if mov.destino else '-',
+                'id_paciente': mov.id_paciente or '-',
+                'detalles': detalles
+            })
+
+        return JsonResponse({'status': 'success', 'movimientos': data})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# Cancelar SolicitudStock
+# ==============================================================================
+@login_required
+@require_POST
+def api_cancelar_solicitud(request):
+    """Cancela/elimina una solicitud pendiente"""
+    try:
+        data = json.loads(request.body)
+        solicitud_id = data.get('solicitud_id')
+
+        solicitud = SolicitudStock.objects.get(id=solicitud_id)
+
+        # Solo se puede cancelar si está PENDIENTE
+        if solicitud.estado != 'PENDIENTE':
+            return JsonResponse({'status': 'error', 'mensaje': 'No se puede cancelar una solicitud ya despachada.'}, status=400)
+
+        # Verificar permisos: solo el creador o un ADMIN
+        grupos_usuario = request.user.groups.values_list('name', flat=True)
+        if not ('ADMIN' in grupos_usuario or solicitud.usuario_solicitante == request.user):
+            return JsonResponse({'status': 'error', 'mensaje': 'No autorizado para cancelar esta solicitud.'}, status=403)
+
+        solicitud.delete()
+        return JsonResponse({'status': 'success', 'mensaje': 'Solicitud cancelada correctamente.'})
+
+    except SolicitudStock.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Solicitud no encontrada.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# Eliminar InventarioStock / Medicamento
+# ==============================================================================
+@login_required
+@require_POST
+def api_eliminar_stock(request):
+    """Elimina un registro de stock, y opcionalmente el medicamento si queda huérfano"""
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        stock_id = data.get('stock_id')
+
+        stock = InventarioStock.objects.select_related('medicamento').get(id=stock_id)
+        medicamento = stock.medicamento
+
+        if stock.cantidad_actual > 0:
+            return JsonResponse({'status': 'error', 'mensaje': f'No se puede eliminar: el lote tiene {stock.cantidad_actual} unidades. Debe agotar el stock primero o ajustar a 0.'}, status=400)
+
+        stock.delete()
+
+        # Si el medicamento ya no tiene stock en ninguna ubicación, lo eliminamos
+        if not InventarioStock.objects.filter(medicamento=medicamento).exists():
+            # Verificar que no tenga movimientos asociados
+            if not DocumentoDetalle.objects.filter(medicamento=medicamento).exists():
+                medicamento.delete()
+
+        return JsonResponse({'status': 'success', 'mensaje': 'Registro de stock eliminado.'})
+
+    except InventarioStock.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Stock no encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# Eliminar Usuario
+# ==============================================================================
+@login_required
+@require_POST
+def api_eliminar_usuario(request):
+    """Elimina un usuario del sistema (solo ADMIN, no a sí mismo)"""
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+
+        if int(user_id) == request.user.id:
+            return JsonResponse({'status': 'error', 'mensaje': 'No puedes eliminarte a ti mismo.'}, status=400)
+
+        user = User.objects.get(id=user_id)
+
+        # Verificar que no tenga movimientos asociados
+        if Documento.objects.filter(usuario=user).exists():
+            return JsonResponse({'status': 'error', 'mensaje': 'No se puede eliminar: el usuario tiene movimientos registrados. Desactívelo en su lugar.'}, status=400)
+
+        # Eliminar perfil y usuario
+        PerfilUsuario.objects.filter(usuario=user).delete()
+        user.delete()
+
+        return JsonResponse({'status': 'success', 'mensaje': 'Usuario eliminado correctamente.'})
+
+    except User.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Usuario no encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)

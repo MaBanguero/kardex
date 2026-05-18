@@ -331,7 +331,8 @@
             tipo_mov: 'DEVOLUCION',
             nombre_medicamento: document.getElementById('dev-med-nombre').innerText,
             id_paciente: document.getElementById('dev-paciente').innerText,
-            cantidad: parseInt(document.getElementById('dev-cantidad').value)
+            cantidad: parseInt(document.getElementById('dev-cantidad').value),
+            doc_id: parseInt(document.getElementById('dev-doc-id').value) || null
         };
 
         fetch("{% url 'registrar_movimiento' %}", {

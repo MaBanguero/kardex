@@ -11,32 +11,85 @@
 
             <div class="mb-8">
                 <h4 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <i class="fas fa-notes-medical"></i> Información del Medicamento
+                    <i class="fas fa-tag"></i> Tipo de Producto
                 </h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo *</label>
-                        <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Tipo *</label>
+                        <select id="prod-tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                            <option value="MEDICAMENTO">💊 Medicamento</option>
+                            <option value="DISPOSITIVO">🔧 Dispositivo Médico</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
-                        <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Vida Útil</label>
+                        <input type="text" id="prod-vida-util" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 5 años">
                     </div>
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
-                        <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
+                </div>
+
+                <div id="seccion-medicamento" class="mb-6">
+                    <h4 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fas fa-notes-medical"></i> Información del Medicamento
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo / Nombre *</label>
+                            <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
+                            <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
+                            <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Concentración</label>
+                            <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
+                            <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
+                            <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
+                        </div>
                     </div>
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Concentración</label>
-                        <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
-                        <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
-                    </div>
-                    <div class="md:col-span-3">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio Fabricante</label>
-                        <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
+                </div>
+
+                <div id="seccion-dispositivo" class="mb-6 hidden">
+                    <h4 class="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i class="fas fa-microchip"></i> Información del Dispositivo Médico
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nombre del Dispositivo *</label>
+                            <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none font-bold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Marca</label>
+                            <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm" placeholder="Ej: Life Care">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Serie</label>
+                            <input type="text" id="prod-serie" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-mono" placeholder="Número de serie">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación Comercial</label>
+                            <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm" placeholder="Ej: Caja x 50 unidades">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Clasificación de Riesgo</label>
+                            <select id="prod-clasif-riesgo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-bold">
+                                <option value="">Seleccione...</option>
+                                <option value="I">I - Bajo</option>
+                                <option value="IIa">IIa - Medio</option>
+                                <option value="IIb">IIb - Medio-Alto</option>
+                                <option value="III">III - Alto</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -78,13 +131,22 @@
 </div>
 
 <script>
-    // Actualizamos el Javascript para capturar los nuevos campos
     const mCont = document.getElementById('modal-producto-container');
     const mBox = document.getElementById('modal-producto-box');
+
+    function toggleTipoProducto() {
+        const tipo = document.getElementById('prod-tipo').value;
+        document.getElementById('seccion-medicamento').classList.toggle('hidden', tipo !== 'MEDICAMENTO');
+        document.getElementById('seccion-dispositivo').classList.toggle('hidden', tipo !== 'DISPOSITIVO');
+    }
+
+    document.getElementById('prod-tipo').addEventListener('change', toggleTipoProducto);
 
     function abrirModalProducto() {
         document.getElementById('form-producto').reset();
         document.getElementById('prod-id').value = "";
+        document.getElementById('prod-tipo').value = 'MEDICAMENTO';
+        toggleTipoProducto();
         document.getElementById('modal-titulo').innerText = "Nuevo Ingreso a Inventario";
         mCont.classList.replace('hidden', 'flex');
         setTimeout(() => mBox.classList.remove('scale-95', 'opacity-0'), 10);
@@ -94,21 +156,23 @@
         abrirModalProducto();
         document.getElementById('modal-titulo').innerText = "Editar Registro: Lote " + item.lote;
 
-        // Mapeo de datos (Asegúrate de que la API de sincronización devuelva estos campos nuevos)
         document.getElementById('prod-id').value = item.id;
+        document.getElementById('prod-tipo').value = item.tipo || 'MEDICAMENTO';
+        toggleTipoProducto();
         document.getElementById('prod-nombre').value = item.principio_activo || "";
         document.getElementById('prod-codigo').value = item.codigo || "";
         document.getElementById('prod-forma').value = item.forma_farmaceutica || "";
         document.getElementById('prod-concentracion').value = item.concentracion || "";
         document.getElementById('prod-presentacion').value = item.presentacion || "";
         document.getElementById('prod-laboratorio').value = item.laboratorio || "";
+        document.getElementById('prod-vida-util').value = item.vida_util || "";
+        document.getElementById('prod-clasif-riesgo').value = item.clasificacion_riesgo || "";
 
         document.getElementById('prod-lote').value = item.lote || "";
         document.getElementById('prod-cantidad').value = item.cantidad_actual || 0;
 
         if(item.fecha_vencimiento) {
-            const parts = item.fecha_vencimiento.split('/');
-            if(parts.length === 3) document.getElementById('prod-vence').value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            document.getElementById('prod-vence').value = item.fecha_vencimiento;
         }
     }
 
@@ -124,15 +188,19 @@
 
         const payload = {
             id: document.getElementById('prod-id').value,
+            tipo: document.getElementById('prod-tipo').value,
             principio_activo: document.getElementById('prod-nombre').value,
             codigo: document.getElementById('prod-codigo').value,
             forma_farmaceutica: document.getElementById('prod-forma').value,
             concentracion: document.getElementById('prod-concentracion').value,
             presentacion: document.getElementById('prod-presentacion').value,
             laboratorio: document.getElementById('prod-laboratorio').value,
+            vida_util: document.getElementById('prod-vida-util').value,
+            clasificacion_riesgo: document.getElementById('prod-clasif-riesgo').value,
             lote: document.getElementById('prod-lote').value,
             fecha_vencimiento: document.getElementById('prod-vence').value,
-            cantidad: document.getElementById('prod-cantidad').value
+            cantidad: document.getElementById('prod-cantidad').value,
+            stock_minimo: document.getElementById('p-stock-minimo').value || 10
         };
 
         fetch("{% url 'api_gestion_producto' %}", {

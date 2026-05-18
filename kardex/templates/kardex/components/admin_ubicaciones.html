@@ -1,0 +1,147 @@
+<div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h3 class="font-black text-slate-800"><i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>Gestión de Sedes / Ubicaciones</h3>
+        <button onclick="abrirModalUbicacion()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition text-sm flex items-center gap-2">
+            <i class="fas fa-plus-circle"></i> Nueva Sede
+        </button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b bg-slate-50">
+                <tr>
+                    <th class="px-6 py-4">Nombre</th>
+                    <th class="px-6 py-4 text-center">Bodega Principal</th>
+                    <th class="px-6 py-4 text-right">Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-ubicaciones" class="divide-y divide-slate-50">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Ubicación -->
+<div id="modal-ubicacion-container" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden transform scale-95 opacity-0 duration-300" id="modal-ubicacion-box">
+        <div class="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+            <h3 id="ubicacion-modal-title" class="font-black text-slate-800">Nueva Sede</h3>
+            <button onclick="cerrarModalUbicacion()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <form id="form-ubicacion" class="p-8 space-y-5">
+            {% csrf_token %}
+            <input type="hidden" id="ubi-id">
+
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nombre de la Sede *</label>
+                <input type="text" id="ubi-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+            </div>
+
+            <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <input type="checkbox" id="ubi-principal" class="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20">
+                <label for="ubi-principal" class="text-sm font-bold text-slate-700">Marcar como Bodega Principal</label>
+            </div>
+
+            <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-600 shadow-lg transition-all active:scale-95">
+                Guardar Sede
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const ubiCont = document.getElementById('modal-ubicacion-container');
+    const ubiBox = document.getElementById('modal-ubicacion-box');
+
+    function cargarUbicaciones() {
+        // Ya tenemos las sedes en window.sedesData (enviadas desde el template)
+        renderUbicaciones(window.sedesData || []);
+    }
+
+    function renderUbicaciones(items) {
+        const tbody = document.getElementById('tabla-ubicaciones');
+        if(!items.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="p-12 text-center text-slate-400 italic">No hay sedes registradas.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(u => `
+            <tr class="hover:bg-slate-50 transition">
+                <td class="px-6 py-4">
+                    <p class="font-bold text-slate-800">${u.nombre}</p>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    ${u.es_bodega_principal
+                        ? '<span class="inline-block bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border border-emerald-100"><i class="fas fa-check-circle mr-1"></i> Principal</span>'
+                        : '<span class="text-[10px] text-slate-400 font-bold">—</span>'}
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <button onclick="editarUbicacion(${u.id}, '${u.nombre.replace(/'/g, "\\'")}', ${u.es_bodega_principal})" class="text-slate-300 hover:text-blue-600 transition p-2" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="eliminarUbicacion(${u.id}, '${u.nombre.replace(/'/g, "\\'")}')" class="text-slate-300 hover:text-red-600 transition p-2" title="Eliminar">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function abrirModalUbicacion() {
+        document.getElementById('form-ubicacion').reset();
+        document.getElementById('ubi-id').value = '';
+        document.getElementById('ubicacion-modal-title').innerText = 'Nueva Sede';
+        ubiCont.classList.replace('hidden', 'flex');
+        setTimeout(() => ubiBox.classList.remove('scale-95', 'opacity-0'), 10);
+    }
+
+    function cerrarModalUbicacion() {
+        ubiBox.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => ubiCont.classList.replace('flex', 'hidden'), 300);
+    }
+
+    function editarUbicacion(id, nombre, principal) {
+        abrirModalUbicacion();
+        document.getElementById('ubicacion-modal-title').innerText = 'Editar Sede';
+        document.getElementById('ubi-id').value = id;
+        document.getElementById('ubi-nombre').value = nombre;
+        document.getElementById('ubi-principal').checked = principal;
+    }
+
+    function eliminarUbicacion(id, nombre) {
+        if(!confirm(`¿Eliminar la sede "${nombre}"?\nSolo se eliminará si no tiene inventario, personal o solicitudes asociados.`)) return;
+        fetch("{% url 'api_gestion_ubicacion' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({accion: 'eliminar', id: id})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success') { alert('✅ ' + d.mensaje); location.reload(); }
+            else alert('❌ ' + d.mensaje);
+        });
+    }
+
+    document.getElementById('form-ubicacion').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.innerText = 'Guardando...';
+
+        fetch("{% url 'api_gestion_ubicacion' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                id: document.getElementById('ubi-id').value,
+                nombre: document.getElementById('ubi-nombre').value,
+                es_bodega_principal: document.getElementById('ubi-principal').checked
+            })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success') { cerrarModalUbicacion(); location.reload(); }
+            else alert('❌ ' + d.mensaje);
+        })
+        .finally(() => { btn.disabled = false; btn.innerText = 'Guardar Sede'; });
+    });
+
+    // Init
+    document.addEventListener('DOMContentLoaded', cargarUbicaciones);
+</script>

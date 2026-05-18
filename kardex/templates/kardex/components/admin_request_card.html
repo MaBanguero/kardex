@@ -50,10 +50,15 @@
                         <span class="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg border border-emerald-100">Solicitado</span>
                     {% endif %}
 
-                    {% if es_admin and req.estado == 'PENDIENTE' %}
-                    <button onclick="cambiarEstadoSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-emerald-500 transition tooltip" title="Marcar como Solicitado/Despachado">
-                        <i class="fas fa-check-circle text-xl"></i>
-                    </button>
+                    {% if req.estado == 'PENDIENTE' %}
+                        {% if es_admin %}
+                        <button onclick="cambiarEstadoSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-emerald-500 transition" title="Despachar">
+                            <i class="fas fa-check-circle text-xl"></i>
+                        </button>
+                        {% endif %}
+                        <button onclick="cancelarSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-red-500 transition" title="Cancelar">
+                            <i class="fas fa-times-circle text-xl"></i>
+                        </button>
                     {% endif %}
                 </div>
             </div>

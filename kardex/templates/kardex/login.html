@@ -50,4 +50,9 @@
     #sidebar, #top-header { display: none !important; }
     main { margin-left: 0 !important; padding-top: 2rem !important; }
 </style>
+
+<script>
+    // Limpiar caché local al salir para que otro usuario no vea datos ajenos
+    localStorage.clear();
+</script>
 {% endblock %}

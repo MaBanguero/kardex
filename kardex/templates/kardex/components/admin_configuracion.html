@@ -1,0 +1,146 @@
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Configuración del Sistema -->
+    <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fas fa-cog"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Reglas del Sistema</h3>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Ventana de devolución</p>
+            </div>
+        </div>
+
+        <form id="form-configuracion" class="space-y-6">
+            {% csrf_token %}
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Horas límite para devolución</label>
+                <div class="relative">
+                    <input type="number" id="cfg-horas" min="1" max="168" value="2" required
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-2xl font-black text-center text-slate-800 focus:ring-4 focus:ring-purple-500/10 outline-none">
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1 font-medium">Define cuántas horas después de una salida el usuario puede devolver medicamentos.</p>
+            </div>
+
+            <button type="submit" id="btn-save-cfg" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-purple-700 shadow-lg shadow-purple-600/20 transition-all active:scale-95">
+                Guardar Configuración
+            </button>
+        </form>
+    </div>
+
+    <!-- Visor de Movimientos -->
+    <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in flex flex-col">
+        <div class="flex items-center justify-between gap-4 mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-2xl flex items-center justify-center text-xl">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg">Movimientos del Sistema</h3>
+                    <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Auditoría completa</p>
+                </div>
+            </div>
+            <button onclick="cargarMovimientos()" class="text-[10px] font-black uppercase bg-slate-100 text-slate-500 px-3 py-2 rounded-lg hover:bg-cyan-500 hover:text-white transition flex items-center gap-1">
+                <i class="fas fa-sync-alt"></i> Refrescar
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto max-h-[500px] pr-2 space-y-3" id="contenedor-movimientos">
+            <div class="text-center p-8 text-slate-400 italic">
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Cargando movimientos...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== CONFIGURACIÓN ==========
+    document.addEventListener('DOMContentLoaded', () => {
+        // Cargar configuración actual
+        fetch("{% url 'api_gestion_configuracion' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({accion: 'obtener'})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success' && d.config) {
+                document.getElementById('cfg-horas').value = d.config.horas_limite_devolucion;
+            }
+        });
+    });
+
+    document.getElementById('form-configuracion').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save-cfg');
+        btn.disabled = true; btn.innerText = 'Guardando...';
+
+        fetch("{% url 'api_gestion_configuracion' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                accion: 'guardar',
+                horas_limite_devolucion: document.getElementById('cfg-horas').value
+            })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success') btn.innerText = '✅ Guardado';
+            else alert('❌ ' + d.mensaje);
+        })
+        .finally(() => setTimeout(() => { btn.disabled = false; btn.innerText = 'Guardar Configuración'; }, 1500));
+    });
+
+    // ========== MOVIMIENTOS ==========
+    function cargarMovimientos() {
+        const cont = document.getElementById('contenedor-movimientos');
+        cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Cargando...</p></div>';
+
+        fetch("{% url 'api_listar_movimientos' %}")
+        .then(r => r.json())
+        .then(d => {
+            if(d.status !== 'success' || !d.movimientos.length) {
+                cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic border-2 border-dashed border-slate-100 rounded-xl"><i class="fas fa-inbox text-3xl mb-2 opacity-50 block"></i>No hay movimientos registrados.</div>';
+                return;
+            }
+
+            const colores = {
+                'ENTRADA': 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                'SALIDA': 'bg-red-50 text-red-600 border-red-100',
+                'TRASLADO': 'bg-amber-50 text-amber-600 border-amber-100',
+                'DEVOLUCION': 'bg-blue-50 text-blue-600 border-blue-100'
+            };
+
+            cont.innerHTML = d.movimientos.map(m => {
+                const badge = colores[m.tipo_mov] || 'bg-slate-50 text-slate-600 border-slate-100';
+                const detHtml = m.detalles.map(det =>
+                    `<span class="text-[10px] bg-white border border-slate-100 px-2 py-0.5 rounded font-bold">${det.cantidad}x ${det.medicamento} (${det.lote})</span>`
+                ).join(' ');
+
+                return `
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:shadow-sm transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-1 text-[9px] font-black uppercase rounded-lg border ${badge}">${m.tipo_mov}</span>
+                                <span class="text-[10px] text-slate-400 font-bold">#${m.id}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-bold">${m.fecha}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1 mb-2">${detHtml}</div>
+                        <div class="text-[9px] text-slate-500 font-medium">
+                            <i class="fas fa-user mr-1"></i>${m.usuario}
+                            <span class="mx-1">|</span>
+                            <i class="fas fa-arrow-right mr-1"></i>${m.origen} → ${m.destino}
+                            ${m.id_paciente !== '-' ? `<span class="mx-1">|</span><i class="fas fa-user-injured mr-1"></i>${m.id_paciente}` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(err => {
+            cont.innerHTML = '<div class="text-center p-8 text-red-400">Error al cargar movimientos.</div>';
+            console.error(err);
+        });
+    }
+</script>
