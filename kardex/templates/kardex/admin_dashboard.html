@@ -308,20 +308,36 @@
         alertasContainer.innerHTML = htmlAlertas;
     }
 
-    // 3. Crear solicitud rápida desde Alerta Roja
+    // 3. Crear solicitud rápida desde Alerta Roja -> agrega al carrito
     function enviarSolicitudRapida(medicamento_id, cantidad) {
-        if(!confirm('¿Enviar solicitud de abastecimiento urgente a la bodega central?')) return;
+        // Buscar el nombre del medicamento en la cache
+        const item = (window.adminCache || []).find(i => i.medicamento_id == medicamento_id);
+        const nombre = item ? item.principio_activo : ('ID ' + medicamento_id);
 
-        fetch("{% url 'api_crear_solicitud' %}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-            body: JSON.stringify({ medicamento_id: medicamento_id, cantidad: cantidad })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.status === 'success') cargarTablaAdmin();
-            else alert("Error: " + data.mensaje);
-        });
+        // Agregar al carrito global
+        if (typeof cart !== 'undefined') {
+            const existente = cart.find(i => i.medicamento_id == medicamento_id);
+            if (existente) {
+                existente.cantidad += cantidad;
+            } else {
+                cart.push({ medicamento_id: medicamento_id, nombre: nombre, cantidad: cantidad });
+            }
+            if (typeof renderCart === 'function') renderCart();
+            switchAdminTab('logistica');
+        } else {
+            // Fallback directo
+            if(!confirm('¿Enviar solicitud de abastecimiento urgente a la bodega central?')) return;
+            fetch("{% url 'api_crear_solicitud' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ items: [{medicamento_id: medicamento_id, cantidad: cantidad}] })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') cargarTablaAdmin();
+                else alert('Error: ' + data.mensaje);
+            });
+        }
     }
 
     // 4. Filtro Local de Búsqueda
