@@ -23,9 +23,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Coolify proxy (Traefik) se conecta internamente sin ocupar puerto host
-    expose:
-      - 8000
+    ports:
+      - "8000:8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?required}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
