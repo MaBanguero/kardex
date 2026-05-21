@@ -5,7 +5,7 @@
             <button onclick="cerrarModalProducto()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
         </div>
 
-        <form id="form-producto" class="p-8">
+        <form id="form-producto" class="p-4 md:p-8">
             {% csrf_token %}
             <input type="hidden" id="prod-id">
 
@@ -27,62 +27,39 @@
                     </div>
                 </div>
 
-                <div id="seccion-medicamento" class="mb-6">
-                    <h4 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <!-- SECCIÓN ÚNICA - cambia labels según el tipo seleccionado -->
+                <div id="seccion-info-producto" class="mb-6">
+                    <h4 id="info-section-title" class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <i class="fas fa-notes-medical"></i> Información del Medicamento
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div class="md:col-span-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo / Nombre *</label>
+                            <label id="lbl-nombre" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo / Nombre *</label>
                             <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
                         </div>
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
                             <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
                         </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
+                        <div id="field-forma">
+                            <label id="lbl-forma" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
                             <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
                         </div>
-                        <div>
+                        <div id="field-concentracion">
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Concentración</label>
                             <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
                         </div>
                         <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
+                            <label id="lbl-presentacion" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
                             <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
                         </div>
                         <div class="md:col-span-3">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
+                            <label id="lbl-laboratorio" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
                             <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
                         </div>
-                    </div>
-                </div>
-
-                <div id="seccion-dispositivo" class="mb-6 hidden">
-                    <h4 class="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <i class="fas fa-microchip"></i> Información del Dispositivo Médico
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="md:col-span-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nombre del Dispositivo *</label>
-                            <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none font-bold text-slate-700">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Marca</label>
-                            <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm" placeholder="Ej: Life Care">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Serie</label>
-                            <input type="text" id="prod-serie" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-mono" placeholder="Número de serie">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación Comercial</label>
-                            <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm" placeholder="Ej: Caja x 50 unidades">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Clasificación de Riesgo</label>
-                            <select id="prod-clasif-riesgo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-sm font-bold">
+                        <div id="field-clasif-riesgo" class="md:col-span-3 hidden">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Clasificación de Riesgo (INVIMA)</label>
+                            <select id="prod-clasif-riesgo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold">
                                 <option value="">Seleccione...</option>
                                 <option value="I">I - Bajo</option>
                                 <option value="IIa">IIa - Medio</option>
@@ -136,8 +113,40 @@
 
     function toggleTipoProducto() {
         const tipo = document.getElementById('prod-tipo').value;
-        document.getElementById('seccion-medicamento').classList.toggle('hidden', tipo !== 'MEDICAMENTO');
-        document.getElementById('seccion-dispositivo').classList.toggle('hidden', tipo !== 'DISPOSITIVO');
+        const esMed = tipo === 'MEDICAMENTO';
+        const sectionTitle = document.getElementById('info-section-title');
+        const titleIcon = sectionTitle.querySelector('i');
+        const lblNombre = document.getElementById('lbl-nombre');
+        const fieldForma = document.getElementById('field-forma');
+        const fieldConc = document.getElementById('field-concentracion');
+        const lblPresentacion = document.getElementById('lbl-presentacion');
+        const lblLaboratorio = document.getElementById('lbl-laboratorio');
+        const fieldClasif = document.getElementById('field-clasif-riesgo');
+        const prodForma = document.getElementById('prod-forma');
+
+        if (esMed) {
+            sectionTitle.innerHTML = '<i class="fas fa-notes-medical"></i> Información del Medicamento';
+            sectionTitle.className = 'text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2';
+            lblNombre.textContent = 'Principio Activo / Nombre *';
+            fieldForma.classList.remove('hidden');
+            fieldConc.classList.remove('hidden');
+            lblPresentacion.textContent = 'Presentación';
+            lblLaboratorio.textContent = 'Laboratorio / Marca';
+            fieldClasif.classList.add('hidden');
+            prodForma.placeholder = 'Ej: Tableta';
+            prodForma.required = true;
+        } else {
+            sectionTitle.innerHTML = '<i class="fas fa-microchip"></i> Información del Dispositivo Médico';
+            sectionTitle.className = 'text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2';
+            lblNombre.textContent = 'Nombre del Dispositivo *';
+            fieldForma.classList.add('hidden');
+            fieldConc.classList.add('hidden');
+            lblPresentacion.textContent = 'Presentación Comercial';
+            lblLaboratorio.textContent = 'Marca';
+            fieldClasif.classList.remove('hidden');
+            prodForma.value = 'NO APLICA';
+            prodForma.required = false;
+        }
     }
 
     document.getElementById('prod-tipo').addEventListener('change', toggleTipoProducto);
@@ -186,12 +195,16 @@
         const btn = document.getElementById('btn-save-prod');
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
 
+        const tipo = document.getElementById('prod-tipo').value;
+        // Para DISPOSITIVO: forma_farmaceutica se envía como "NO APLICA"
+        const formaVal = tipo === 'DISPOSITIVO' ? 'NO APLICA' : document.getElementById('prod-forma').value;
+
         const payload = {
             id: document.getElementById('prod-id').value,
-            tipo: document.getElementById('prod-tipo').value,
+            tipo: tipo,
             principio_activo: document.getElementById('prod-nombre').value,
             codigo: document.getElementById('prod-codigo').value,
-            forma_farmaceutica: document.getElementById('prod-forma').value,
+            forma_farmaceutica: formaVal,
             concentracion: document.getElementById('prod-concentracion').value,
             presentacion: document.getElementById('prod-presentacion').value,
             laboratorio: document.getElementById('prod-laboratorio').value,

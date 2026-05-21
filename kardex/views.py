@@ -292,16 +292,43 @@ def api_gestion_producto(request):
             if tipo_val not in ('MEDICAMENTO', 'DISPOSITIVO'):
                 tipo_val = 'MEDICAMENTO'
 
-            medicamento, _ = Medicamento.objects.get_or_create(
-                principio_activo=data.get('principio_activo').strip().upper(),
-                forma_farmaceutica=data.get('forma_farmaceutica', '').strip().upper()
-            )
+            principio_activo = data.get('principio_activo', '').strip().upper()
+            if not principio_activo:
+                raise ValueError('El principio activo/nombre es obligatorio.')
+
+            forma_farmaceutica = data.get('forma_farmaceutica', '').strip().upper()
+
+            if tipo_val == 'DISPOSITIVO':
+                # Para DISPOSITIVO: lookup solo por principio_activo, forma_farmaceutica = 'NO APLICA'
+                forma_farmaceutica = 'NO APLICA'
+                medicamento, _ = Medicamento.objects.get_or_create(
+                    principio_activo=principio_activo,
+                    defaults={'forma_farmaceutica': forma_farmaceutica}
+                )
+                medicamento.forma_farmaceutica = forma_farmaceutica
+            else:
+                # Para MEDICAMENTO: lookup por principio_activo + forma_farmaceutica
+                if not forma_farmaceutica:
+                    raise ValueError('La forma farmacéutica es obligatoria para medicamentos.')
+                medicamento, _ = Medicamento.objects.get_or_create(
+                    principio_activo=principio_activo,
+                    forma_farmaceutica=forma_farmaceutica
+                )
 
             # Control de nulos para campos únicos
             codigo_ingresado = data.get('codigo', '').strip()
-            medicamento.codigo = codigo_ingresado if codigo_ingresado else None
+            if codigo_ingresado:
+                # Verificar que el código no esté duplicado en otro medicamento
+                codigo_qs = Medicamento.objects.filter(codigo=codigo_ingresado)
+                if medicamento.pk:
+                    codigo_qs = codigo_qs.exclude(pk=medicamento.pk)
+                if codigo_qs.exists():
+                    raise ValueError(f"El código '{codigo_ingresado}' ya está registrado en otro producto.")
+                medicamento.codigo = codigo_ingresado
+            else:
+                medicamento.codigo = None
             medicamento.tipo = tipo_val
-            medicamento.concentracion = data.get('concentracion', medicamento.concentracion)
+            medicamento.concentracion = data.get('concentracion', medicamento.concentracion) if tipo_val == 'MEDICAMENTO' else None
             medicamento.presentacion = data.get('presentacion', medicamento.presentacion)
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
             medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
