@@ -25,6 +25,9 @@ services:
         condition: service_healthy
     ports:
       - "8777:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.kardex.loadbalancer.server.port=8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?required}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
