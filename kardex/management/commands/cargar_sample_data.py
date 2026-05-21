@@ -73,24 +73,26 @@ class Command(BaseCommand):
 
         # ---------- Verificar si ya hay datos ----------
         stock_existente = InventarioStock.objects.filter(ubicacion=ubicacion).count()
-        if stock_existente > 0 and not hacer_clear and not force:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"Ya hay {stock_existente} registros de stock en '{sede_nombre}'."
-                )
-            )
-            if not self._confirmar("¿Deseas agregar datos de muestra adicionales?"):
-                self.stdout.write("Operación cancelada.")
-                return
-
-        if hacer_clear:
+        if stock_existente > 0 and hacer_clear:
             if not force:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Ya hay {stock_existente} registros de stock en '{sede_nombre}'."
+                    )
+                )
                 if not self._confirmar(
-                    f"¿Estás seguro de limpiar todos los datos de '{sede_nombre}'?"
+                    f"¿Limpiar y recargar datos de '{sede_nombre}'?"
                 ):
                     self.stdout.write("Operación cancelada.")
                     return
             self._limpiar_datos(ubicacion)
+        elif stock_existente > 0:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Ya hay {stock_existente} registros de stock — saltando carga (usa --clear para recargar)."
+                )
+            )
+            return
 
         # ---------- Asegurar Bodega Central ----------
         bodega_central, _ = Ubicacion.objects.get_or_create(

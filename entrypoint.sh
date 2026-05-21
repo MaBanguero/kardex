@@ -7,6 +7,9 @@ set -e
 echo "→ Running database migrations..."
 python manage.py migrate --noinput
 
+echo "→ Cargando datos de demostración (se salta si ya existen)..."
+python manage.py cargar_sample_data --sede=FarmaciaSede1 2>&1 || echo "  (aviso menor ignorado)"
+
 echo "→ Collecting static files..."
 python manage.py collectstatic --noinput --clear 2>/dev/null || python manage.py collectstatic --noinput
 
