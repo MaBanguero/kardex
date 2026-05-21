@@ -25,14 +25,20 @@ services:
         condition: service_healthy
     ports:
       - "8777:8000"
+    networks:
+      - default
+      - coolify
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.kardex.entrypoints=https"
+      - "traefik.http.routers.kardex.rule=Host(`kardex.esenorte3.lat`)"
+      - "traefik.http.routers.kardex.tls.certresolver=letsencrypt"
       - "traefik.http.services.kardex.loadbalancer.server.port=8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?required}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+      DJANGO_ALLOWED_HOSTS: kardex.esenorte3.lat,localhost,127.0.0.1
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://kardex.esenorte3.lat
       POSTGRES_DB: ${POSTGRES_DB:-kardex}
       POSTGRES_USER: ${POSTGRES_USER:-kardex}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kardex}
@@ -41,3 +47,7 @@ services:
 
 volumes:
   postgres_data:
+
+networks:
+  coolify:
+    external: true
