@@ -23,9 +23,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Coolify proxy se conecta al puerto interno 8000
-    expose:
-      - 8000
+    # Coolify proxy se conecta al puerto mapeado
+    ports:
+      - "${PORT:-8000}:8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?required}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
