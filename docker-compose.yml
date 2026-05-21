@@ -23,9 +23,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Coolify proxy se conecta al puerto mapeado
     ports:
-      - "${PORT:-8000}:8000"
+      - "8000:8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?required}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
@@ -36,12 +35,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kardex}
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
 
 volumes:
   postgres_data:
