@@ -1,3 +1,4 @@
+import uuid
 import json
 import datetime
 from django.shortcuts import render
@@ -492,17 +493,26 @@ def api_gestion_usuario(request):
 @login_required
 @require_POST
 def api_crear_solicitud(request):
-    """Recibe la solicitud rápida desde el botón rojo de alerta"""
+    """Recibe una lista de items (carrito) y crea solicitudes agrupadas por grupo_id"""
     try:
         data = json.loads(request.body)
-        SolicitudStock.objects.create(
-            medicamento_id=data['medicamento_id'],
-            sede_solicitante=request.user.perfil.ubicacion_asignada,
-            usuario_solicitante=request.user,
-            cantidad_pedida=data.get('cantidad', 50), # Cantidad sugerida por defecto
-            estado='PENDIENTE'
-        )
-        return JsonResponse({'status': 'success'})
+        items = data.get('items', [])  # [{medicamento_id: X, cantidad: Y}, ...]
+
+        if not items:
+            return JsonResponse({'status': 'error', 'mensaje': 'Debe agregar al menos un medicamento.'}, status=400)
+
+        grupo_id = str(uuid.uuid4())
+        for item in items:
+            SolicitudStock.objects.create(
+                medicamento_id=item['medicamento_id'],
+                sede_solicitante=request.user.perfil.ubicacion_asignada,
+                usuario_solicitante=request.user,
+                cantidad_pedida=item.get('cantidad', 50),
+                estado='PENDIENTE',
+                grupo_id=grupo_id
+            )
+
+        return JsonResponse({'status': 'success', 'grupo_id': grupo_id})
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
 
@@ -510,107 +520,69 @@ def api_crear_solicitud(request):
 @login_required
 @require_POST
 def api_atender_solicitud(request):
-    """Aprueba un pedido, cambia su estado y suma el inventario automáticamente"""
-
-    # Solo los administradores pueden despachar pedidos
+    """Despacha TODAS las solicitudes pendientes de un grupo_id"""
     grupos_usuario = request.user.groups.values_list('name', flat=True)
     if 'ADMIN' not in grupos_usuario:
-        return JsonResponse({'status': 'error', 'mensaje': 'Solo el Administrador Central puede despachar pedidos.'},
-                            status=403)
-
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
     try:
         data = json.loads(request.body)
-        solicitud_id = data.get('solicitud_id')
+        grupo_id = data.get('grupo_id')
+        solicitudes = SolicitudStock.objects.filter(grupo_id=grupo_id, estado='PENDIENTE')
+        if not solicitudes.exists():
+            return JsonResponse({'status': 'error', 'mensaje': 'No hay solicitudes pendientes en este grupo.'}, status=400)
 
-        # Usamos atomic() para asegurar que todo se guarde perfecto, o nada se guarde.
         with transaction.atomic():
-            solicitud = SolicitudStock.objects.select_related('medicamento', 'sede_solicitante').get(id=solicitud_id)
+            for solicitud in solicitudes.select_related('medicamento', 'sede_solicitante').select_for_update():
+                bodega_central = Ubicacion.objects.filter(es_bodega_principal=True).first()
+                if bodega_central:
+                    total_stock_origen = InventarioStock.objects.filter(
+                        ubicacion=bodega_central, medicamento=solicitud.medicamento
+                    ).aggregate(total=Sum('cantidad_actual'))['total'] or 0
+                    if total_stock_origen < solicitud.cantidad_pedida:
+                        raise ValueError(f"Stock insuficiente para {solicitud.medicamento.principio_activo}. Disponible: {total_stock_origen}, Solicitado: {solicitud.cantidad_pedida}")
 
-            # Evitar doble clic o doble despacho
-            if solicitud.estado != 'PENDIENTE':
-                raise ValueError("Esta solicitud ya fue atendida y despachada anteriormente.")
+                    cantidad_restante = solicitud.cantidad_pedida
+                    stocks_origen = InventarioStock.objects.filter(
+                        ubicacion=bodega_central, medicamento=solicitud.medicamento, cantidad_actual__gt=0
+                    ).select_for_update().order_by('fecha_vencimiento')
+                    for s in stocks_origen:
+                        if cantidad_restante <= 0: break
+                        a_descontar = min(s.cantidad_actual, cantidad_restante)
+                        s.cantidad_actual -= a_descontar
+                        s.save()
+                        cantidad_restante -= a_descontar
 
-            # 1. VERIFICAR QUE LA BODEGA CENTRAL TENGA STOCK
-            bodega_central = Ubicacion.objects.filter(es_bodega_principal=True).first()
-            if bodega_central:
-                stock_origen = InventarioStock.objects.filter(
-                    ubicacion=bodega_central,
-                    medicamento=solicitud.medicamento
-                ).select_for_update().first()
+                # Sumar a sede destino
+                stock = InventarioStock.objects.filter(
+                    medicamento=solicitud.medicamento, ubicacion=solicitud.sede_solicitante
+                ).order_by('-fecha_vencimiento').first()
+                if stock:
+                    stock.cantidad_actual += solicitud.cantidad_pedida
+                    stock.save()
+                    lote_destino = stock.lote
+                else:
+                    lote_destino = 'ASIGNADO-CENTRAL'
+                    InventarioStock.objects.create(
+                        ubicacion=solicitud.sede_solicitante, medicamento=solicitud.medicamento,
+                        lote=lote_destino, fecha_vencimiento=timezone.now().date() + timedelta(days=365),
+                        cantidad_actual=solicitud.cantidad_pedida, stock_minimo=10
+                    )
 
-                total_stock_origen = InventarioStock.objects.filter(
-                    ubicacion=bodega_central,
-                    medicamento=solicitud.medicamento
-                ).aggregate(total=Sum('cantidad_actual'))['total'] or 0
-
-                if total_stock_origen < solicitud.cantidad_pedida:
-                    raise ValueError(
-                        f"Stock insuficiente en bodega central. Disponible: {total_stock_origen}, Solicitado: {solicitud.cantidad_pedida}")
-
-                # Descontar de la bodega central (FEFO)
-                cantidad_restante = solicitud.cantidad_pedida
-                stocks_origen = InventarioStock.objects.filter(
-                    ubicacion=bodega_central,
-                    medicamento=solicitud.medicamento,
-                    cantidad_actual__gt=0
-                ).select_for_update().order_by('fecha_vencimiento')
-
-                for s in stocks_origen:
-                    if cantidad_restante <= 0:
-                        break
-                    a_descontar = min(s.cantidad_actual, cantidad_restante)
-                    s.cantidad_actual -= a_descontar
-                    s.save()
-                    cantidad_restante -= a_descontar
-
-            # 2. ACTUALIZAR EL INVENTARIO DE LA SEDE
-            stock = InventarioStock.objects.filter(
-                medicamento=solicitud.medicamento,
-                ubicacion=solicitud.sede_solicitante
-            ).order_by('-fecha_vencimiento').first()
-
-            if stock:
-                stock.cantidad_actual += solicitud.cantidad_pedida
-                stock.save()
-                lote_destino = stock.lote
-            else:
-                InventarioStock.objects.create(
-                    ubicacion=solicitud.sede_solicitante,
-                    medicamento=solicitud.medicamento,
-                    lote='ASIGNADO-CENTRAL',
-                    fecha_vencimiento=timezone.now().date() + timedelta(days=365),
-                    cantidad_actual=solicitud.cantidad_pedida,
-                    stock_minimo=10
+                doc = Documento.objects.create(
+                    tipo_mov='ENTRADA', usuario=request.user, destino=solicitud.sede_solicitante,
+                    origen=bodega_central, id_paciente=f"SOL-{solicitud.id}"
                 )
-                lote_destino = 'ASIGNADO-CENTRAL'
+                DocumentoDetalle.objects.create(
+                    documento=doc, medicamento=solicitud.medicamento, lote=lote_destino, cantidad=solicitud.cantidad_pedida
+                )
+                solicitud.estado = 'SOLICITADO'
+                solicitud.save()
 
-            # 3. CREAR DOCUMENTO CONTABLE
-            doc = Documento.objects.create(
-                tipo_mov='ENTRADA',
-                usuario=request.user,
-                destino=solicitud.sede_solicitante,
-                origen=bodega_central,
-                id_paciente=f"SOL-{solicitud.id}"
-            )
-            DocumentoDetalle.objects.create(
-                documento=doc,
-                medicamento=solicitud.medicamento,
-                lote=lote_destino,
-                cantidad=solicitud.cantidad_pedida
-            )
-
-            # 4. ACTUALIZAR EL ESTADO DEL PEDIDO
-            solicitud.estado = 'SOLICITADO'
-            solicitud.save()
-
-        return JsonResponse({'status': 'success', 'mensaje': 'Despacho realizado y stock sumado correctamente.'})
-
-    except SolicitudStock.DoesNotExist:
-        return JsonResponse({'status': 'error', 'mensaje': 'No se encontró la solicitud en el sistema.'}, status=404)
+        return JsonResponse({'status': 'success', 'mensaje': f'{solicitudes.count()} items despachados correctamente.'})
     except ValueError as ve:
         return JsonResponse({'status': 'error', 'mensaje': str(ve)}, status=400)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'mensaje': f'Error interno: {str(e)}'}, status=500)
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
 
 
 # ==============================================================================
@@ -768,27 +740,21 @@ def api_listar_movimientos(request):
 @login_required
 @require_POST
 def api_cancelar_solicitud(request):
-    """Cancela/elimina una solicitud pendiente"""
+    """Cancela/elimina TODAS las solicitudes pendientes de un grupo_id"""
     try:
         data = json.loads(request.body)
-        solicitud_id = data.get('solicitud_id')
+        grupo_id = data.get('grupo_id')
+        solicitudes = SolicitudStock.objects.filter(grupo_id=grupo_id, estado='PENDIENTE')
+        if not solicitudes.exists():
+            return JsonResponse({'status': 'error', 'mensaje': 'No hay solicitudes pendientes en este grupo.'}, status=400)
 
-        solicitud = SolicitudStock.objects.get(id=solicitud_id)
-
-        # Solo se puede cancelar si está PENDIENTE
-        if solicitud.estado != 'PENDIENTE':
-            return JsonResponse({'status': 'error', 'mensaje': 'No se puede cancelar una solicitud ya despachada.'}, status=400)
-
-        # Verificar permisos: solo el creador o un ADMIN
         grupos_usuario = request.user.groups.values_list('name', flat=True)
-        if not ('ADMIN' in grupos_usuario or solicitud.usuario_solicitante == request.user):
-            return JsonResponse({'status': 'error', 'mensaje': 'No autorizado para cancelar esta solicitud.'}, status=403)
+        if not ('ADMIN' in grupos_usuario or solicitudes.first().usuario_solicitante == request.user):
+            return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
 
-        solicitud.delete()
-        return JsonResponse({'status': 'success', 'mensaje': 'Solicitud cancelada correctamente.'})
-
-    except SolicitudStock.DoesNotExist:
-        return JsonResponse({'status': 'error', 'mensaje': 'Solicitud no encontrada.'}, status=404)
+        count = solicitudes.count()
+        solicitudes.delete()
+        return JsonResponse({'status': 'success', 'mensaje': f'{count} solicitud(es) cancelada(s).'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
 

@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -16,6 +18,7 @@ class SolicitudStock(models.Model):
 
     cantidad_pedida = models.PositiveIntegerField()
     estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    grupo_id = models.UUIDField(default=uuid.uuid4, editable=False, db_index=True)
 
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

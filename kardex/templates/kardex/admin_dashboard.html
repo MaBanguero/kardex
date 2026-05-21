@@ -349,9 +349,9 @@
     document.addEventListener('DOMContentLoaded', () => cargarTablaAdmin());
 
     // Función para despachar el pedido con 1 clic
-function cambiarEstadoSolicitud(solicitudId) {
+function cambiarEstadoSolicitud(grupoId) {
     // 1. Confirmación de seguridad
-    if(!confirm('¿Confirmas el despacho de esta solicitud? Se sumará la cantidad automáticamente al inventario de la sede destino.')) {
+    if(!confirm('¿Confirmas el despacho de TODOS los items de este grupo? Se sumará la cantidad automáticamente al inventario de la sede destino.')) {
         return;
     }
 
@@ -362,7 +362,7 @@ function cambiarEstadoSolicitud(solicitudId) {
             'Content-Type': 'application/json',
             'X-CSRFToken': '{{ csrf_token }}' // Permiso de seguridad
         },
-        body: JSON.stringify({ solicitud_id: solicitudId })
+        body: JSON.stringify({ grupo_id: grupoId })
     })
     .then(res => res.json())
     .then(data => {
@@ -411,12 +411,12 @@ function eliminarUsuario(userId, username) {
 }
 
 // Cancelar solicitud
-function cancelarSolicitud(solicitudId) {
-    if(!confirm('¿Cancelar esta solicitud de stock?')) return;
+function cancelarSolicitud(grupoId) {
+    if(!confirm('¿Cancelar TODAS las solicitudes pendientes de este grupo?')) return;
     fetch("{% url 'api_cancelar_solicitud' %}", {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-        body: JSON.stringify({solicitud_id: solicitudId})
+        body: JSON.stringify({grupo_id: grupoId})
     })
     .then(r => r.json())
     .then(d => {

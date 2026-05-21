@@ -9,11 +9,15 @@
         </div>
     </div>
 
-    <form id="form-nueva-solicitud" class="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
-        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Crear Nuevo Pedido</h4>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="col-span-2">
-                <select id="req-medicamento" required class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-slate-700">
+    <!-- 🛒 Carrito: Agregar medicamentos -->
+    <div class="mb-6 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+            <i class="fas fa-shopping-cart mr-1"></i> Carrito de Solicitud
+            <span id="cart-count" class="ml-2 px-2 py-0.5 bg-amber-500 text-white rounded-full text-[9px]">0</span>
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="md:col-span-2">
+                <select id="req-medicamento" class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-slate-700">
                     <option value="" disabled selected>Seleccione el medicamento...</option>
                     {% for med in medicamentos %}
                         <option value="{{ med.id }}">{{ med.principio_activo }} {{ med.concentracion|default:"" }}</option>
@@ -21,43 +25,75 @@
                 </select>
             </div>
             <div>
-                <input type="number" id="req-cantidad" placeholder="Cant." min="1" required class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-center">
+                <input type="number" id="req-cantidad" placeholder="Cant." min="1" value="50" class="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-center">
+            </div>
+            <div>
+                <button type="button" onclick="agregarAlCarrito()" class="w-full h-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-md text-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-plus-circle"></i> Agregar
+                </button>
             </div>
         </div>
-        <button type="submit" class="w-full mt-4 bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition shadow-md shadow-amber-500/20 text-sm">
-            Enviar Solicitud a Central
-        </button>
-    </form>
 
+        <!-- Lista del carrito -->
+        <div id="cart-items" class="mt-4 space-y-2 max-h-52 overflow-y-auto">
+            <div class="text-center py-4 text-slate-400 italic text-sm border-2 border-dashed border-slate-200 rounded-xl" id="cart-empty-msg">
+                <i class="fas fa-box-open mr-1"></i> Carrito vacío. Agregue medicamentos arriba.
+            </div>
+        </div>
+
+        <!-- Botón enviar carrito -->
+        <button type="button" id="btn-enviar-carrito" onclick="enviarCarrito()" disabled class="w-full mt-4 bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition shadow-md shadow-amber-500/20 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <i class="fas fa-truck mr-2"></i> 📦 Enviar Solicitud (<span id="btn-cart-count">0</span> items)
+        </button>
+    </div>
+
+    <!-- 📋 Historial agrupado por grupo_id -->
     <div class="flex-1 overflow-y-auto pr-2">
         <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b pb-2">Historial de Pedidos</h4>
 
-        <div class="space-y-3">
-            {% for req in solicitudes %}
-            <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:shadow-md transition group">
-                <div>
-                    <p class="font-bold text-slate-800 text-sm">{{ req.medicamento.principio_activo }}</p>
-                    <p class="text-[10px] text-slate-400 mt-1">
-                        <span class="font-black text-slate-600">Cant: {{ req.cantidad_pedida }}</span> •
-                        {% if es_admin %} Sede: {{ req.sede_solicitante.nombre }} {% else %} {{ req.fecha_solicitud|date:"d/m/Y" }} {% endif %}
-                    </p>
+        {% regroup solicitudes by grupo_id as grupos %}
+        <div class="space-y-4">
+            {% for grupo in grupos %}
+            <div class="bg-white border border-slate-100 rounded-xl p-4 hover:shadow-md transition">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <span class="text-[9px] font-mono text-slate-400 font-bold">GRUPO {{ grupo.grouper|truncatechars:12 }}</span>
+                        <span class="ml-2 px-2 py-0.5 rounded text-[9px] font-black uppercase
+                            {% if grupo.list.0.estado == 'PENDIENTE' %}bg-amber-50 text-amber-600 border border-amber-100
+                            {% else %}bg-emerald-50 text-emerald-600 border border-emerald-100{% endif %}">
+                            {{ grupo.list.0.estado }}
+                        </span>
+                    </div>
+                    <span class="text-[10px] text-slate-400">{{ grupo.list.0.fecha_solicitud|date:"d/m/Y H:i" }}</span>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    {% if req.estado == 'PENDIENTE' %}
-                        <span class="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black uppercase rounded-lg border border-amber-100">Pendiente</span>
-                    {% else %}
-                        <span class="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg border border-emerald-100">Solicitado</span>
-                    {% endif %}
+                <div class="space-y-2">
+                    {% for req in grupo.list %}
+                    <div class="flex items-center justify-between py-1.5 px-3 bg-slate-50 rounded-lg">
+                        <div>
+                            <p class="text-sm font-bold text-slate-700">
+                                {% if req.medicamento.tipo == 'DISPOSITIVO' %}🔧{% else %}💊{% endif %}
+                                {{ req.medicamento.principio_activo }}
+                            </p>
+                            <p class="text-[10px] text-slate-400">{{ req.medicamento.forma_farmaceutica }} {{ req.medicamento.concentracion|default:"" }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-black text-slate-700">{{ req.cantidad_pedida }} uds</span>
+                            <p class="text-[9px] text-slate-400">por {{ req.usuario_solicitante.get_full_name|default:req.usuario_solicitante.username }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
 
-                    {% if req.estado == 'PENDIENTE' %}
+                <div class="flex items-center justify-end gap-3 mt-3 pt-3 border-t border-slate-100">
+                    {% if grupo.list.0.estado == 'PENDIENTE' %}
                         {% if es_admin %}
-                        <button onclick="cambiarEstadoSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-emerald-500 transition" title="Despachar">
-                            <i class="fas fa-check-circle text-xl"></i>
+                        <button onclick="cambiarEstadoSolicitud('{{ grupo.grouper }}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs transition shadow-sm flex items-center gap-1">
+                            <i class="fas fa-check-circle"></i> Despachar Todo
                         </button>
                         {% endif %}
-                        <button onclick="cancelarSolicitud('{{ req.id }}')" class="text-slate-300 hover:text-red-500 transition" title="Cancelar">
-                            <i class="fas fa-times-circle text-xl"></i>
+                        <button onclick="cancelarSolicitud('{{ grupo.grouper }}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-xs transition shadow-sm flex items-center gap-1">
+                            <i class="fas fa-times-circle"></i> Cancelar Todo
                         </button>
                     {% endif %}
                 </div>
@@ -70,3 +106,144 @@
         </div>
     </div>
 </div>
+
+<script>
+// 🛒 Carrito de compras
+let cart = [];
+
+function agregarAlCarrito() {
+    const select = document.getElementById('req-medicamento');
+    const cantidad = parseInt(document.getElementById('req-cantidad').value) || 1;
+    const medId = select.value;
+    const medText = select.options[select.selectedIndex]?.text;
+
+    if (!medId) {
+        alert('Seleccione un medicamento.');
+        return;
+    }
+
+    // Verificar duplicados
+    const existente = cart.find(item => item.medicamento_id == medId);
+    if (existente) {
+        existente.cantidad += cantidad;
+    } else {
+        cart.push({ medicamento_id: parseInt(medId), nombre: medText, cantidad: cantidad });
+    }
+
+    renderCart();
+    // Reset
+    select.value = '';
+    document.getElementById('req-cantidad').value = 50;
+}
+
+function eliminarDelCarrito(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cart-items');
+    const count = document.getElementById('cart-count');
+    const btnCount = document.getElementById('btn-cart-count');
+    const btn = document.getElementById('btn-enviar-carrito');
+    const emptyMsg = document.getElementById('cart-empty-msg');
+
+    count.textContent = cart.length;
+    btnCount.textContent = cart.length;
+    btn.disabled = cart.length === 0;
+
+    if (cart.length === 0) {
+        container.innerHTML = `<div class="text-center py-4 text-slate-400 italic text-sm border-2 border-dashed border-slate-200 rounded-xl" id="cart-empty-msg">
+            <i class="fas fa-box-open mr-1"></i> Carrito vacío. Agregue medicamentos arriba.
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = cart.map((item, idx) => `
+        <div class="flex items-center justify-between py-2 px-3 bg-white border border-slate-200 rounded-lg">
+            <div>
+                <p class="text-sm font-bold text-slate-700">💊 ${item.nombre}</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-sm font-black text-amber-600">${item.cantidad} uds</span>
+                <button onclick="eliminarDelCarrito(${idx})" class="text-red-400 hover:text-red-600 transition p-1" title="Eliminar">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function enviarCarrito() {
+    if (cart.length === 0) {
+        alert('El carrito está vacío.');
+        return;
+    }
+
+    if (!confirm(`¿Enviar solicitud con ${cart.length} medicamento(s) a la bodega central?`)) return;
+
+    const items = cart.map(item => ({
+        medicamento_id: item.medicamento_id,
+        cantidad: item.cantidad
+    }));
+
+    fetch("{% url 'api_crear_solicitud' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ items: items })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ Solicitud enviada correctamente.');
+            cart = [];
+            renderCart();
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err));
+}
+
+// Override global functions for grupo_id-based operations
+function cambiarEstadoSolicitud(grupoId) {
+    if (!confirm('¿Confirmas el despacho de TODOS los items de este grupo?')) return;
+
+    fetch("{% url 'api_atender_solicitud' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ grupo_id: grupoId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.mensaje);
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err));
+}
+
+function cancelarSolicitud(grupoId) {
+    if (!confirm('¿Cancelar TODAS las solicitudes pendientes de este grupo?')) return;
+
+    fetch("{% url 'api_cancelar_solicitud' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ grupo_id: grupoId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.mensaje);
+            location.reload();
+        } else {
+            alert('❌ Error: ' + data.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err));
+}
+</script>
