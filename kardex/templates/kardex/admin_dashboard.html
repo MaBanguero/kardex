@@ -50,8 +50,8 @@
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
             <input type="text" id="admin-busqueda" oninput="filtrarAdminTable()" class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 transition" placeholder="Buscar medicamento o lote...">
         </div>
-        <div class="w-full md:w-auto overflow-x-auto -mx-2 px-2">
-            <div class="flex gap-2 min-w-max">
+        <div class="w-full md:w-auto">
+            <div class="flex flex-wrap gap-2">
                 <div class="flex bg-slate-100 rounded-xl p-1 mr-1">
                     <button onclick="filtrarTipo('TODOS')" id="filtro-tipo-TODOS" class="px-2 md:px-3 py-2 text-[10px] font-black rounded-lg bg-white text-blue-700 shadow-sm transition-all">TODOS</button>
                     <button onclick="filtrarTipo('MEDICAMENTO')" id="filtro-tipo-MEDICAMENTO" class="px-2 md:px-3 py-2 text-[10px] font-black rounded-lg text-slate-500 hover:text-slate-700 transition-all">💊 MEDS</button>
@@ -60,11 +60,11 @@
                 <button onclick="abrirModalProducto()" class="bg-slate-900 text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl font-bold hover:bg-blue-600 transition shadow-lg flex items-center justify-center gap-1 md:gap-2 text-xs md:text-sm">
                     <i class="fas fa-plus-circle"></i> <span class="hidden md:inline">Nuevo Producto</span><span class="md:hidden">Nuevo</span>
                 </button>
-                <div class="relative group">
-                    <button class="bg-emerald-600 text-white px-3 md:px-4 py-3 md:py-4 rounded-2xl font-bold hover:bg-emerald-700 transition shadow-lg flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <div class="relative" id="export-btn-container">
+                    <button onclick="toggleExportDropdown(event)" class="bg-emerald-600 text-white px-3 md:px-4 py-3 md:py-4 rounded-2xl font-bold hover:bg-emerald-700 transition shadow-lg flex items-center gap-1 md:gap-2 text-xs md:text-sm">
                         <i class="fas fa-file-excel"></i> <span class="hidden md:inline">Exportar ▾</span><span class="md:hidden">Excel</span>
                     </button>
-                    <div class="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                    <div id="export-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
                         <a href="{% url 'exportar_excel' %}?tipo=MEDICAMENTO" class="flex items-center gap-3 px-5 py-4 hover:bg-blue-50 text-slate-700 font-bold text-sm transition">
                             <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">💊</span>
                             Kardex Medicamentos
@@ -440,5 +440,21 @@ function cancelarSolicitud(grupoId) {
         else alert('❌ ' + d.mensaje);
     });
 }
+
+// Toggle dropdown Exportar (funciona en hover y click)
+function toggleExportDropdown(e) {
+    e.stopPropagation();
+    const dd = document.getElementById('export-dropdown');
+    dd.classList.toggle('hidden');
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('export-btn-container');
+    if (container && !container.contains(e.target)) {
+        const dd = document.getElementById('export-dropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+});
 </script>
 {% endblock %}
