@@ -71,6 +71,22 @@
                 </div>
             </div>
 
+            {% if es_admin %}
+            <div class="mb-6">
+                <h4 class="text-xs font-black text-purple-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i class="fas fa-map-pin"></i> Sede de Destino
+                </h4>
+                <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100">
+                    <select id="prod-sede" class="w-full bg-white border border-purple-200 rounded-xl p-3 focus:ring-4 focus:ring-purple-500/10 outline-none font-bold text-slate-700">
+                        {% for s in sedes %}
+                        <option value="{{ s.id }}" {% if s.id == ubicacion.id %}selected{% endif %}>{{ s.nombre }}{% if s.es_bodega_principal %} 🏪{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-[10px] text-purple-500 font-medium mt-2"><i class="fas fa-info-circle"></i> Selecciona la sede donde se registrará el stock.</p>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="mb-8">
                 <h4 class="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <i class="fas fa-boxes"></i> Información de Lote e Inventario
@@ -165,6 +181,13 @@
         abrirModalProducto();
         document.getElementById('modal-titulo').innerText = "Editar Registro: Lote " + item.lote;
 
+        // En edición, la sede se bloquea (no se puede mover stock entre sedes)
+        const prodSede = document.getElementById('prod-sede');
+        if (prodSede) {
+            prodSede.disabled = true;
+            prodSede.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
         document.getElementById('prod-id').value = item.id;
         document.getElementById('prod-tipo').value = item.tipo || 'MEDICAMENTO';
         toggleTipoProducto();
@@ -186,6 +209,12 @@
     }
 
     function cerrarModalProducto() {
+        // Restaurar sede selector al cerrar
+        const prodSede = document.getElementById('prod-sede');
+        if (prodSede) {
+            prodSede.disabled = false;
+            prodSede.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
         mBox.classList.add('scale-95', 'opacity-0');
         setTimeout(() => mCont.classList.replace('flex', 'hidden'), 300);
     }
@@ -199,8 +228,9 @@
         // Para DISPOSITIVO: forma_farmaceutica se envía como "NO APLICA"
         const formaVal = tipo === 'DISPOSITIVO' ? 'NO APLICA' : document.getElementById('prod-forma').value;
 
+        const prodId = document.getElementById('prod-id').value;
         const payload = {
-            id: document.getElementById('prod-id').value,
+            id: prodId,
             tipo: tipo,
             principio_activo: document.getElementById('prod-nombre').value,
             codigo: document.getElementById('prod-codigo').value,
@@ -215,6 +245,12 @@
             cantidad: document.getElementById('prod-cantidad').value,
             stock_minimo: document.getElementById('p-stock-minimo').value || 10
         };
+
+        // Solo incluir sede al crear (no al editar)
+        const prodSede = document.getElementById('prod-sede');
+        if (prodSede && !prodId) {
+            payload.ubicacion_id = parseInt(prodSede.value);
+        }
 
         fetch("{% url 'api_gestion_producto' %}", {
             method: "POST",

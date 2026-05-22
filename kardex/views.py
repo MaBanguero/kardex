@@ -286,7 +286,16 @@ def api_gestion_producto(request):
     try:
         data = json.loads(request.body)
         producto_id = data.get('id')
-        ubicacion_actual = request.user.perfil.ubicacion_asignada
+
+        # ADMIN puede elegir sede; REGENTE solo su propia sede
+        if 'ADMIN' in grupos_usuario:
+            ubicacion_id = data.get('ubicacion_id')
+            if ubicacion_id:
+                ubicacion_actual = Ubicacion.objects.get(id=ubicacion_id)
+            else:
+                ubicacion_actual = request.user.perfil.ubicacion_asignada
+        else:
+            ubicacion_actual = request.user.perfil.ubicacion_asignada
 
         with transaction.atomic():
             tipo_val = data.get('tipo', 'MEDICAMENTO')
