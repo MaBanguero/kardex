@@ -200,6 +200,11 @@
 <script>
     // 1. Manejo de Navegación por Pestañas
     function switchAdminTab(target) {
+        // Actualizar URL sin recargar (para sync con sidebar)
+        const url = new URL(window.location);
+        if (target === 'productos') url.searchParams.delete('tab');
+        else url.searchParams.set('tab', target);
+        window.history.replaceState({}, '', url);
         const sections = ['productos', 'usuarios', 'logistica', 'ubicaciones', 'configuracion'];
         sections.forEach(s => {
             const el = document.getElementById(`admin-vista-${s}`);
@@ -362,7 +367,15 @@
     }
 
     // Inicializar al cargar
-    document.addEventListener('DOMContentLoaded', () => cargarTablaAdmin());
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarTablaAdmin();
+        // Leer ?tab= del URL y cambiar a esa pestaña
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab && ['usuarios','logistica','ubicaciones','configuracion'].includes(tab)) {
+            switchAdminTab(tab);
+        }
+    });
 
     // Función para despachar el pedido con 1 clic
 function cambiarEstadoSolicitud(grupoId) {

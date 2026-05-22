@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="mb-8 animate-fade-in">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 tracking-tight">Panel de Usuario</h1>
+            <p class="text-slate-500 font-medium">Sede Operativa: <span class="text-blue-600 font-bold">{{ ubicacion.nombre }}</span></p>
+        </div>
+        <div class="px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sesión: {{ request.user.username }}</p>
+            <div class="flex gap-1 mt-1">
+                {% for g in request.user.groups.all %}
+                <span class="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">{{ g.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
     {% include "kardex/components/tabs.html" %}
 
     {% include "kardex/components/vista_inventario.html" %}
