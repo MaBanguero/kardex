@@ -1,12 +1,18 @@
-<div id="modal-container" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto">
-    <div class="min-h-full flex items-start sm:items-center justify-center p-0 sm:p-4">
-        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-3xl shadow-2xl overflow-hidden transform transition-all scale-95 opacity-0 duration-300 mt-auto sm:mt-0" id="modal-box">
-            <div class="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
-                <h3 class="font-bold text-slate-800 text-base sm:text-lg">Registrar Movimiento</h3>
-                <button onclick="cerrarModal()" class="text-slate-400 hover:text-slate-600 transition w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100"><i class="fas fa-times text-lg"></i></button>
+<div id="modal-container" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+        <div id="modal-box" class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-3xl shadow-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col transform transition-all scale-95 opacity-0 duration-300">
+            <!-- Header sticky -->
+            <div class="sticky top-0 z-10 bg-slate-50 rounded-t-2xl sm:rounded-t-3xl border-b border-slate-100">
+                <div class="flex justify-between items-center p-4 sm:p-6">
+                    <h3 class="font-bold text-slate-800 text-base sm:text-lg">Registrar Movimiento</h3>
+                    <button type="button" onclick="cerrarModal()" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition flex-shrink-0">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
             </div>
 
-            <form id="form-movimiento" class="p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <!-- Content scrolleable -->
+            <form id="form-movimiento" class="overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
                 {% csrf_token %}
                 <input type="hidden" id="modal-id-med">
 
@@ -17,23 +23,23 @@
 
                 <div>
                     <label class="block text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de Operación</label>
-                    <select id="modal-tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3.5 text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition font-medium text-slate-700">
+                    <select id="modal-tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-blue-500/20 outline-none transition font-medium text-slate-700">
                         <option value="SALIDA">Salida a Paciente</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID Paciente / Historia</label>
-                    <input type="text" id="modal-paciente" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3.5 text-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition font-medium text-slate-700" placeholder="Ingrese documento">
+                    <input type="text" id="modal-paciente" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-blue-500/20 outline-none transition font-medium text-slate-700" placeholder="Ingrese documento">
                 </div>
 
                 <div>
                     <label class="block text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cantidad Unidades</label>
-                    <input type="number" id="modal-cantidad" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3.5 text-lg sm:text-xl font-bold text-slate-800 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition">
+                    <input type="number" id="modal-cantidad" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-lg sm:text-xl font-bold text-slate-800 focus:ring-4 focus:ring-blue-500/20 outline-none transition">
                 </div>
 
-                <div class="pt-1 sm:pt-2 pb-2 sm:pb-0">
-                    <button type="submit" id="btn-submit" class="w-full bg-blue-600 text-white py-4 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all">
+                <div class="py-2 sm:pt-2 sm:pb-0">
+                    <button type="submit" id="btn-submit" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all">
                         Confirmar Registro
                     </button>
                 </div>
@@ -42,18 +48,20 @@
     </div>
 </div>
 
-<div id="modal-devolucion" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto">
-    <div class="min-h-full flex items-start sm:items-center justify-center p-0 sm:p-4">
-        <div class="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-3xl shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-300 mt-auto sm:mt-0" id="box-devolucion">
-            <div class="sticky top-0 z-10 bg-white">
-                <div class="p-4 sm:p-6 border-b border-slate-100">
+<div id="modal-devolucion" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm transition-opacity">
+    <div class="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+        <div id="box-devolucion" class="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-3xl shadow-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col transform scale-95 opacity-0 transition-all duration-300">
+            <!-- Header sticky -->
+            <div class="sticky top-0 z-10 bg-white rounded-t-2xl sm:rounded-t-3xl border-b border-slate-100">
+                <div class="p-4 sm:p-6">
                     <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm sm:text-lg">
                         <i class="fas fa-undo text-blue-500"></i> Procesar Devolución
                     </h3>
                 </div>
             </div>
 
-            <div class="p-4 sm:p-6">
+            <!-- Content scrolleable -->
+            <div class="overflow-y-auto p-4 sm:p-6">
                 <div class="bg-slate-50 p-3 sm:p-4 rounded-xl mb-4 border border-slate-100">
                     <p class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Medicamento a devolver</p>
                     <p id="dev-med-nombre" class="font-bold text-slate-800 text-base sm:text-lg leading-tight mt-1"></p>
@@ -64,13 +72,13 @@
                     <input type="hidden" id="dev-doc-id">
                     <input type="hidden" id="dev-stock-id">
                     <label class="block text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cantidad a Reingresar</label>
-                    <input type="number" id="dev-cantidad" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3.5 text-xl sm:text-2xl text-center font-black text-slate-800 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition mb-4 sm:mb-6">
+                    <input type="number" id="dev-cantidad" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xl sm:text-2xl text-center font-black text-slate-800 focus:ring-4 focus:ring-blue-500/20 outline-none transition mb-4 sm:mb-6">
 
                     <div class="flex gap-3 pb-2 sm:pb-0">
-                        <button type="button" onclick="cerrarModalDev()" class="flex-1 py-3.5 sm:py-3.5 text-sm text-slate-600 font-bold bg-slate-100 hover:bg-slate-200 rounded-xl transition-all active:scale-95">
+                        <button type="button" onclick="cerrarModalDev()" class="flex-1 py-3.5 text-sm text-slate-600 font-bold bg-slate-100 hover:bg-slate-200 rounded-xl transition-all active:scale-95">
                             Cancelar
                         </button>
-                        <button type="submit" id="btn-submit-dev" class="flex-[1.5] py-3.5 sm:py-3.5 text-sm text-white font-bold bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all">
+                        <button type="submit" id="btn-submit-dev" class="flex-[1.5] py-3.5 text-sm text-white font-bold bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/30 active:scale-95 transition-all">
                             Confirmar
                         </button>
                     </div>
