@@ -27,7 +27,7 @@
 
         <div class="bg-amber-50 border border-amber-100 p-3 rounded-xl">
             <p class="text-[9px] text-amber-700 font-bold leading-tight">
-                <i class="fas fa-info-circle mr-1"></i> Asegúrate de que las fechas tengan el formato <span class="underline">AAAA-MM-DD</span> y no dejar columnas obligatorias vacías.
+                <i class="fas fa-info-circle mr-1"></i> Columna <b>tipo</b>: <span class="underline">MEDICAMENTO</span> o <span class="underline">DISPOSITIVO</span>. Fechas en formato <span class="underline">AAAA-MM-DD</span>. Para dispositivos, <b>forma_farmaceutica</b> = NO APLICA.
             </p>
         </div>
 
@@ -40,10 +40,12 @@
 <script>
     // Generador de plantilla dinámica
     function descargarPlantillaCSV() {
-        const encabezados = ["principio_activo", "forma_farmaceutica", "concentracion", "lote", "fecha_vencimiento", "cantidad", "stock_minimo", "presentacion", "laboratorio", "codigo"];
-        const ejemplo = ["ACETAMINOFEN", "TABLETA", "500MG", "LOTE123", "2026-12-31", "100", "20", "CAJA X 10", "GENFAR", "770123456"];
+        // Dos ejemplos: MEDICAMENTO + DISPOSITIVO
+        const encabezados = ["tipo", "principio_activo", "forma_farmaceutica", "concentracion", "lote", "fecha_vencimiento", "cantidad", "stock_minimo", "presentacion", "laboratorio", "codigo"];
+        const ejemplo1 = ["MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG", "LOTE123", "2026-12-31", "100", "20", "CAJA X 10", "GENFAR", "770123456"];
+        const ejemplo2 = ["DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "", "LOTE456", "2027-06-30", "500", "50", "CAJA X 100", "ECOPIEL", ""];
 
-        const contenidoCsv = encabezados.join(",") + "\n" + ejemplo.join(",");
+        const contenidoCsv = encabezados.join(",") + "\n" + ejemplo1.join(",") + "\n" + ejemplo2.join(",");
         const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
 

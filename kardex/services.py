@@ -990,15 +990,29 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
     contador = 0
     with transaction.atomic():
         for row in reader:
+            # 0. Determinar tipo: MEDICAMENTO | DISPOSITIVO
+            tipo = row.get('tipo', 'MEDICAMENTO').strip().upper()
+            if tipo not in ('MEDICAMENTO', 'DISPOSITIVO'):
+                tipo = 'MEDICAMENTO'
+
             # 1. Buscar o crear el Medicamento (base de catálogo)
             principio = row.get('principio_activo', '').strip().upper()
-            forma = row.get('forma_farmaceutica', row.get('forma', '')).strip().upper()
 
-            medicamento, _ = Medicamento.objects.get_or_create(
-                principio_activo=principio,
-                forma_farmaceutica=forma
-            )
+            if tipo == 'DISPOSITIVO':
+                # Dispositivo: lookup solo por principio_activo, forma forzada
+                forma = 'NO APLICA'
+                medicamento, _ = Medicamento.objects.get_or_create(
+                    principio_activo=principio,
+                    forma_farmaceutica=forma
+                )
+            else:
+                forma = row.get('forma_farmaceutica', row.get('forma', '')).strip().upper()
+                medicamento, _ = Medicamento.objects.get_or_create(
+                    principio_activo=principio,
+                    forma_farmaceutica=forma
+                )
 
+            medicamento.tipo = tipo
             codigo = row.get('codigo', '').strip()
             medicamento.codigo = codigo if codigo else None
             medicamento.concentracion = row.get('concentracion', '')
