@@ -977,8 +977,14 @@ def generar_excel_kardex_consolidado(mes, anio, tipo='MEDICAMENTO'):
 
 def procesar_carga_masiva_productos(usuario, archivo_csv):
     """
-    Lee un CSV y actualiza o crea stock masivamente.
-    Formato esperado: principio_activo, forma_farmaceutica, lote, fecha_vencimiento(YYYY-MM-DD), cantidad
+    Carga masiva desde CSV. La plantilla incluye todos los campos.
+    Según el tipo (MEDICAMENTO|DISPOSITIVO) se toman solo los relevantes.
+
+    Columnas completas:
+      tipo, principio_activo, forma_farmaceutica, concentracion,
+      presentacion, laboratorio, codigo, registro_invima,
+      vida_util, clasificacion_riesgo,
+      lote, fecha_vencimiento, cantidad, stock_minimo
     """
     if not usuario.groups.filter(name='ADMIN').exists():
         raise PermissionError("No tienes permisos para realizar cargas masivas.")
@@ -990,16 +996,13 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
     contador = 0
     with transaction.atomic():
         for row in reader:
-            # 0. Determinar tipo: MEDICAMENTO | DISPOSITIVO
             tipo = row.get('tipo', 'MEDICAMENTO').strip().upper()
             if tipo not in ('MEDICAMENTO', 'DISPOSITIVO'):
                 tipo = 'MEDICAMENTO'
 
-            # 1. Buscar o crear el Medicamento (base de catálogo)
             principio = row.get('principio_activo', '').strip().upper()
 
             if tipo == 'DISPOSITIVO':
-                # Dispositivo: lookup solo por principio_activo, forma forzada
                 forma = 'NO APLICA'
                 medicamento, _ = Medicamento.objects.get_or_create(
                     principio_activo=principio,
@@ -1012,17 +1015,28 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                     forma_farmaceutica=forma
                 )
 
+            # --- Campos comunes ---
             medicamento.tipo = tipo
-            codigo = row.get('codigo', '').strip()
-            medicamento.codigo = codigo if codigo else None
-            medicamento.concentracion = row.get('concentracion', '')
+            medicamento.codigo = row.get('codigo', '').strip() or None
             medicamento.presentacion = row.get('presentacion', '')
             medicamento.laboratorio = row.get('laboratorio', '')
+            medicamento.registro_invima = row.get('registro_invima', '')
+
+            if tipo == 'MEDICAMENTO':
+                medicamento.concentracion = row.get('concentracion', '')
+            else:
+                medicamento.concentracion = ''
+                medicamento.vida_util = row.get('vida_util', '')
+                medicamento.clasificacion_riesgo = row.get('clasificacion_riesgo', '').strip()
+
             medicamento.save()
 
-            # 2. Actualizar o crear el Stock en la sede del admin
+            # --- Stock ---
             lote = row.get('lote', '').strip().upper()
-            stock, created = InventarioStock.objects.get_or_create(
+            if not lote:
+                continue  # saltar filas sin lote
+
+            stock, _ = InventarioStock.objects.get_or_create(
                 ubicacion=usuario.perfil.ubicacion_asignada,
                 medicamento=medicamento,
                 lote=lote,
@@ -1033,7 +1047,7 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 }
             )
 
-            stock.cantidad_actual += int(row['cantidad'])
+            stock.cantidad_actual += int(row.get('cantidad', 0))
             stock.save()
             contador += 1
 

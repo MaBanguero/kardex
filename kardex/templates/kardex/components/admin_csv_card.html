@@ -27,7 +27,8 @@
 
         <div class="bg-amber-50 border border-amber-100 p-3 rounded-xl">
             <p class="text-[9px] text-amber-700 font-bold leading-tight">
-                <i class="fas fa-info-circle mr-1"></i> Columna <b>tipo</b>: <span class="underline">MEDICAMENTO</span> o <span class="underline">DISPOSITIVO</span>. Fechas en formato <span class="underline">AAAA-MM-DD</span>. Para dispositivos, <b>forma_farmaceutica</b> = NO APLICA.
+                <i class="fas fa-info-circle mr-1"></i> Columnas completas. Según el <b>tipo</b> (<span class="underline">MEDICAMENTO</span> o <span class="underline">DISPOSITIVO</span>) el sistema ignora campos no aplicables.
+                <br>Fechas: <span class="underline">AAAA-MM-DD</span>. Dispositivo: forma_farmaceutica = NO APLICA.
             </p>
         </div>
 
@@ -40,15 +41,33 @@
 <script>
     // Generador de plantilla dinámica
     function descargarPlantillaCSV() {
-        // Dos ejemplos: MEDICAMENTO + DISPOSITIVO
-        const encabezados = ["tipo", "principio_activo", "forma_farmaceutica", "concentracion", "lote", "fecha_vencimiento", "cantidad", "stock_minimo", "presentacion", "laboratorio", "codigo"];
-        const ejemplo1 = ["MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG", "LOTE123", "2026-12-31", "100", "20", "CAJA X 10", "GENFAR", "770123456"];
-        const ejemplo2 = ["DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "", "LOTE456", "2027-06-30", "500", "50", "CAJA X 100", "ECOPIEL", ""];
+        const encabezados = [
+            "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
+            "presentacion", "laboratorio", "codigo", "registro_invima",
+            "vida_util", "clasificacion_riesgo",
+            "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
+        ];
 
-        const contenidoCsv = encabezados.join(",") + "\n" + ejemplo1.join(",") + "\n" + ejemplo2.join(",");
+        // MEDICAMENTO: todos los campos aplican
+        const med = [
+            "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
+            "CAJA X 10", "GENFAR", "770123456", "2020M-0012345",
+            "", "",
+            "LOTE001", "2026-12-31", "100", "20"
+        ];
+
+        // DISPOSITIVO: forma_farmaceutica=NO APLICA, concentracion vacio,
+        // vida_util y clasificacion_riesgo aplican
+        const disp = [
+            "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
+            "CAJA X 100", "ECOPIEL", "", "INVIMA-2025E-001234",
+            "3 AÑOS", "I",
+            "LOTE002", "2027-06-30", "500", "50"
+        ];
+
+        const contenidoCsv = encabezados.join(",") + "\n" + med.join(",") + "\n" + disp.join(",");
         const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
-
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
         link.setAttribute("download", "plantilla_inventario_kardex.csv");
