@@ -13,7 +13,7 @@ from datetime import timedelta
 
 # Importamos nuestros modelos y la lógica ACID
 from .models import InventarioStock, PerfilUsuario
-from .services import generar_excel_kardex, generar_excel_kardex_consolidado, calcular_semaforo, registrar_salida_paciente_inteligente, registrar_devolucion_agrupada, procesar_carga_masiva_productos
+from .services import generar_excel_kardex, generar_excel_kardex_consolidado, calcular_semaforo, registrar_salida_paciente_inteligente, registrar_devolucion_agrupada, procesar_carga_masiva_productos, generar_plantilla_xlsx
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
@@ -528,6 +528,18 @@ def api_carga_masiva(request):
         # Errores fatales de base de datos
         return JsonResponse({'status': 'error', 'mensaje': f'Error interno procesando el archivo: {str(e)}'},
                             status=400)
+
+
+@login_required
+def descargar_plantilla_carga(request):
+    """Descarga la plantilla de carga masiva en formato XLSX"""
+    wb = generar_plantilla_xlsx()
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename=plantilla_carga_masiva_kardex.xlsx'
+    wb.save(response)
+    return response
 
 
 @login_required

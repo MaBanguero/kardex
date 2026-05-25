@@ -33,6 +33,9 @@ urlpatterns = [
     # Genera y descarga el archivo XLSX con el formato hospitalario
     path('exportar/', views.exportar_kardex_excel, name='exportar_excel'),
 
+    # Descarga la plantilla de carga masiva en XLSX
+    path('api/plantilla-carga/', views.descargar_plantilla_carga, name='plantilla_carga'),
+
     # --- Panel Administrativo Personalizado (NUEVO) ---
     # Ruta: localhost:8000/admin-kardex/
     path('admin-kardex/', views.admin_dashboard_view, name='admin_dashboard'),

@@ -1063,3 +1063,103 @@ def registrar_solicitud_reabastecimiento(usuario, nombre_med, cantidad):
         id_paciente=f"REQ-{nombre_med[:3].upper()}",  # Tag de seguimiento
         # En los detalles guardamos qué se pidió
     )
+
+
+def generar_plantilla_xlsx():
+    """
+    Genera un workbook XLSX con la plantilla de carga masiva.
+    Incluye dos filas de ejemplo: MEDICAMENTO y DISPOSITIVO.
+    """
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Plantilla Carga Masiva"
+
+    fuente_titulo = Font(bold=True, size=11, name='Arial', color='FFFFFF')
+    fuente_normal = Font(size=10, name='Arial')
+    alineacion_centro = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    alineacion_izq = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    borde_fino = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    fondo_azul = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+    fondo_ejemplo_med = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
+    fondo_ejemplo_disp = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+
+    encabezados = [
+        "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
+        "presentacion", "laboratorio", "codigo", "registro_invima",
+        "vida_util", "clasificacion_riesgo",
+        "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
+    ]
+
+    # Ejemplo medicamento
+    ejemplo_med = [
+        "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
+        "CAJA X 10", "GENFAR", "770123456", "2020M-0012345",
+        "", "",
+        "LOTE001", "2026-12-31", "100", "20"
+    ]
+
+    # Ejemplo dispositivo
+    ejemplo_disp = [
+        "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
+        "CAJA X 100", "ECOPIEL", "", "INVIMA-2025E-001234",
+        "3 AÑOS", "I",
+        "LOTE002", "2027-06-30", "500", "50"
+    ]
+
+    # Hoja informativa (fila 1)
+    ws.merge_cells('A1:N1')
+    ws['A1'] = "PLANTILLA DE CARGA MASIVA - KARDEX FARMACIA"
+    ws['A1'].font = Font(bold=True, size=14, name='Arial', color='1E3A8A')
+    ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    ws.merge_cells('A2:N2')
+    ws['A2'] = "Complete los datos. Las columnas marcadas con HEADER AZUL son obligatorias segun el tipo. Borre las filas de ejemplo antes de importar."
+    ws['A2'].font = Font(size=9, name='Arial', italic=True, color='64748B')
+    ws['A2'].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    ws.row_dimensions[2].height = 25
+
+    # Fila de headers (fila 4)
+    row_header = 4
+    ws.row_dimensions[row_header].height = 28
+    for col_idx, titulo in enumerate(encabezados, start=1):
+        celda = ws.cell(row=row_header, column=col_idx, value=titulo)
+        celda.font = fuente_titulo
+        celda.alignment = alineacion_centro
+        celda.fill = fondo_azul
+        celda.border = borde_fino
+
+    # Ejemplo MEDICAMENTO (fila 5)
+    row_med = 5
+    ws.row_dimensions[row_med].height = 22
+    for col_idx, valor in enumerate(ejemplo_med, start=1):
+        celda = ws.cell(row=row_med, column=col_idx, value=valor)
+        celda.font = fuente_normal
+        celda.alignment = alineacion_centro if col_idx in (1, 4, 11, 12, 13, 14) else alineacion_izq
+        celda.fill = fondo_ejemplo_med
+        celda.border = borde_fino
+
+    # Ejemplo DISPOSITIVO (fila 6)
+    row_disp = 6
+    ws.row_dimensions[row_disp].height = 22
+    for col_idx, valor in enumerate(ejemplo_disp, start=1):
+        celda = ws.cell(row=row_disp, column=col_idx, value=valor)
+        celda.font = fuente_normal
+        celda.alignment = alineacion_centro if col_idx in (1, 4, 11, 12, 13, 14) else alineacion_izq
+        celda.fill = fondo_ejemplo_disp
+        celda.border = borde_fino
+
+    # Anchos de columna
+    anchos = {'A': 14, 'B': 30, 'C': 20, 'D': 14, 'E': 18, 'F': 16,
+              'G': 14, 'H': 22, 'I': 10, 'J': 20, 'K': 12, 'L': 18,
+              'M': 10, 'N': 12}
+    for letra, ancho in anchos.items():
+        ws.column_dimensions[letra].width = ancho
+
+    # Congelar paneles
+    ws.freeze_panes = 'A5'
+
+    return wb
