@@ -1,65 +1,64 @@
-<div id="modal-producto-container" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto">
-    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden my-8 transform transition-all scale-95 opacity-0 duration-300" id="modal-producto-box">
-        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
-            <h3 id="modal-titulo" class="font-black text-slate-800 text-lg">Gestionar Registro</h3>
-            <button onclick="cerrarModalProducto()" class="text-slate-400 hover:text-slate-600 transition"><i class="fas fa-times text-xl"></i></button>
+<div id="modal-producto-container" class="fixed inset-0 z-[100] hidden items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto">
+    <div class="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-4 sm:my-8 transform transition-all scale-95 opacity-0 duration-300" id="modal-producto-box">
+        <div class="p-3 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
+            <h3 id="modal-titulo" class="font-black text-slate-800 text-sm sm:text-lg">Gestionar Registro</h3>
+            <button onclick="cerrarModalProducto()" class="text-slate-400 hover:text-slate-600 transition p-1"><i class="fas fa-times text-lg sm:text-xl"></i></button>
         </div>
 
-        <form id="form-producto" class="p-4 md:p-8">
+        <form id="form-producto" class="p-3 sm:p-8">
             {% csrf_token %}
             <input type="hidden" id="prod-id">
 
-            <div class="mb-8">
-                <h4 class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <div class="mb-6 sm:mb-8">
+                <h4 class="text-[10px] sm:text-xs font-black text-blue-600 uppercase tracking-widest mb-3 sm:mb-4 flex items-center gap-2">
                     <i class="fas fa-tag"></i> Tipo de Producto
                 </h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Tipo *</label>
-                        <select id="prod-tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                        <select id="prod-tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
                             <option value="MEDICAMENTO">💊 Medicamento</option>
                             <option value="DISPOSITIVO">🔧 Dispositivo Médico</option>
                         </select>
                     </div>
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Vida Útil</label>
-                        <input type="text" id="prod-vida-util" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 5 años">
+                        <input type="text" id="prod-vida-util" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 5 años">
                     </div>
                 </div>
 
-                <!-- SECCIÓN ÚNICA - cambia labels según el tipo seleccionado -->
-                <div id="seccion-info-producto" class="mb-6">
-                    <h4 id="info-section-title" class="text-xs font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <div id="seccion-info-producto" class="mb-4 sm:mb-6">
+                    <h4 id="info-section-title" class="text-[10px] sm:text-xs font-black text-blue-600 uppercase tracking-widest mb-3 sm:mb-4 flex items-center gap-2">
                         <i class="fas fa-notes-medical"></i> Información del Medicamento
                     </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                        <div class="sm:col-span-2 md:col-span-2">
                             <label id="lbl-nombre" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Principio Activo / Nombre *</label>
-                            <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                            <input type="text" id="prod-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700 text-sm">
                         </div>
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
-                            <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
+                            <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-sm text-slate-600" placeholder="Opcional">
                         </div>
                         <div id="field-forma">
                             <label id="lbl-forma" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
-                            <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
+                            <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Tableta">
                         </div>
                         <div id="field-concentracion">
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Concentración</label>
-                            <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
+                            <input type="text" id="prod-concentracion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: 500mg">
                         </div>
                         <div>
                             <label id="lbl-presentacion" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
-                            <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
+                            <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm" placeholder="Ej: Caja x 30">
                         </div>
-                        <div class="md:col-span-3">
+                        <div class="sm:col-span-2 md:col-span-3">
                             <label id="lbl-laboratorio" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
-                            <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
+                            <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm text-slate-600">
                         </div>
-                        <div id="field-clasif-riesgo" class="md:col-span-3 hidden">
+                        <div id="field-clasif-riesgo" class="sm:col-span-2 md:col-span-3 hidden">
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Clasificación de Riesgo (INVIMA)</label>
-                            <select id="prod-clasif-riesgo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold">
+                            <select id="prod-clasif-riesgo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm font-bold">
                                 <option value="">Seleccione...</option>
                                 <option value="I">I - Bajo</option>
                                 <option value="IIa">IIa - Medio</option>
@@ -72,12 +71,12 @@
             </div>
 
             {% if es_admin %}
-            <div class="mb-6">
-                <h4 class="text-xs font-black text-purple-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <div class="mb-4 sm:mb-6">
+                <h4 class="text-[10px] sm:text-xs font-black text-purple-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <i class="fas fa-map-pin"></i> Sede de Destino
                 </h4>
-                <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100">
-                    <select id="prod-sede" class="w-full bg-white border border-purple-200 rounded-xl p-3 focus:ring-4 focus:ring-purple-500/10 outline-none font-bold text-slate-700">
+                <div class="bg-purple-50 p-3 sm:p-4 rounded-2xl border border-purple-100">
+                    <select id="prod-sede" class="w-full bg-white border border-purple-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-purple-500/10 outline-none font-bold text-slate-700 text-sm">
                         {% for s in sedes %}
                         <option value="{{ s.id }}" {% if s.id == ubicacion.id %}selected{% endif %}>{{ s.nombre }}{% if s.es_bodega_principal %} 🏪{% endif %}</option>
                         {% endfor %}
@@ -87,35 +86,34 @@
             </div>
             {% endif %}
 
-            <div class="mb-8">
-                <h4 class="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <div class="mb-6 sm:mb-8">
+                <h4 class="text-[10px] sm:text-xs font-black text-emerald-600 uppercase tracking-widest mb-3 sm:mb-4 flex items-center gap-2">
                     <i class="fas fa-boxes"></i> Información de Lote e Inventario
                 </h4>
-                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-50 p-3 sm:p-5 rounded-2xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                     <div>
                         <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Lote Físico *</label>
-                        <input type="text" id="prod-lote" required class="w-full bg-white border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none font-mono uppercase text-slate-800">
+                        <input type="text" id="prod-lote" required class="w-full bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none font-mono uppercase text-slate-800 text-sm">
                     </div>
                     <div>
                         <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Vencimiento *</label>
-                        <input type="date" id="prod-vence" required class="w-full bg-white border border-slate-200 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-slate-800">
+                        <input type="date" id="prod-vence" required class="w-full bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-emerald-500/10 outline-none text-slate-800 text-sm">
                     </div>
                     <div>
                         <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Cantidad Total *</label>
-                        <input type="number" id="prod-cantidad" required min="0" class="w-full bg-white border border-emerald-300 rounded-xl p-3 focus:ring-4 focus:ring-emerald-500/20 outline-none font-black text-xl text-slate-800 text-center shadow-sm">
+                        <input type="number" id="prod-cantidad" required min="0" class="w-full bg-white border border-emerald-300 rounded-xl p-2.5 sm:p-3 focus:ring-4 focus:ring-emerald-500/20 outline-none font-black text-lg sm:text-xl text-slate-800 text-center shadow-sm">
                     </div>
                     <div>
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Límite
-                            Mínimo (Alerta)</label>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Límite Mínimo (Alerta)</label>
                         <input type="number" id="p-stock-minimo" value="10" required
-                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 focus:ring-4 focus:ring-amber-500/10 outline-none font-bold text-amber-600"
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3.5 focus:ring-4 focus:ring-amber-500/10 outline-none font-bold text-amber-600"
                                placeholder="Ej: 10">
                     </div>
                 </div>
             </div>
 
-            <div class="pt-2">
-                <button type="submit" id="btn-save-prod" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-600 shadow-lg shadow-slate-900/20 transition-all active:scale-95">
+            <div class="pt-1 sm:pt-2">
+                <button type="submit" id="btn-save-prod" class="w-full bg-slate-900 text-white py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-sm sm:text-lg hover:bg-blue-600 shadow-lg shadow-slate-900/20 transition-all active:scale-95">
                     Guardar Registro en Sistema
                 </button>
             </div>
