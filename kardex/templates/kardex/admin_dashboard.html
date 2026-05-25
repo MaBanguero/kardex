@@ -6,6 +6,13 @@
         <div>
             <h1 class="text-3xl font-black text-slate-800 tracking-tight">Panel de Control Administrativo</h1>
             <p class="text-slate-500 font-medium">Sede Operativa: <span class="text-blue-600 font-bold">{{ ubicacion.nombre }}</span></p>
+            {% if turno_activo %}
+            <p class="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5">
+                <i class="fas fa-user-nurse"></i> Enfermera de Turno: <span class="text-slate-800">{{ turno_activo.enfermera.get_full_name|default:turno_activo.enfermera.username }}</span>
+                <span class="text-emerald-500">•</span>
+                <span class="font-mono" id="turno-countdown-admin" data-expires="{{ turno_activo.fecha_expiracion|date:'c' }}">{{ turno_activo.expires_in_minutes }} min</span>
+            </p>
+            {% endif %}
         </div>
         <div class="px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sesión: {{ request.user.username }}</p>

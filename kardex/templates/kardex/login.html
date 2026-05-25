@@ -12,7 +12,12 @@
             <p class="text-sm text-slate-500 font-medium mt-1">Acceso Seguro al Sistema</p>
         </div>
 
-        {% if form.errors %}
+        {% if form.non_field_errors %}
+        <div class="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-bold leading-relaxed mb-6 border border-red-100">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            {{ form.non_field_errors.0 }}
+        </div>
+        {% elif form.errors %}
         <div class="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-bold flex items-center gap-2 mb-6 border border-red-100">
             <i class="fas fa-exclamation-triangle"></i> Usuario o contraseña incorrectos.
         </div>

@@ -148,3 +148,33 @@ class DocumentoDetalle(models.Model):
 
     def __str__(self):
         return f"{self.cantidad}x {self.medicamento.codigo} (Lote: {self.lote})"
+
+
+class TurnoEnfermera(models.Model):
+    """
+    Control de turno único por sede para enfermeras.
+    Solo UNA enfermera puede estar activa por turno de 12h.
+    """
+    enfermera = models.ForeignKey(User, on_delete=models.CASCADE, related_name='turnos_enfermera')
+    sede = models.ForeignKey(Ubicacion, on_delete=models.CASCADE, related_name='turnos_enfermera')
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    fecha_expiracion = models.DateTimeField()
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Turno de Enfermera'
+        verbose_name_plural = 'Turnos de Enfermeras'
+        ordering = ['-fecha_inicio']
+
+    def expires_in_minutes(self):
+        """Minutos restantes del turno"""
+        if not self.activo:
+            return 0
+        remaining = (self.fecha_expiracion - timezone.now()).total_seconds() / 60
+        return max(0, int(remaining))
+
+    def is_expired(self):
+        return timezone.now() >= self.fecha_expiracion
+
+    def __str__(self):
+        return f"Turno {self.enfermera.get_full_name()} en {self.sede.nombre} ({'Activo' if self.activo else 'Inactivo'})"

@@ -5,7 +5,7 @@ from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from .models import Documento, ConfiguracionSistema, DocumentoDetalle, Medicamento, User, Ubicacion, SolicitudStock
+from .models import Documento, ConfiguracionSistema, DocumentoDetalle, Medicamento, User, Ubicacion, SolicitudStock, TurnoEnfermera
 from django.db import transaction
 from django.db.models import Sum, Q as models_Q
 from django.utils import timezone
@@ -19,9 +19,77 @@ from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
 
 
+def get_turno_activo(ubicacion):
+    """
+    Retorna el TurnoEnfermera activo NO expirado para una sede,
+    o None si no hay turno activo.
+    """
+    if not ubicacion:
+        return None
+    now = timezone.now()
+    hora_limite = now - timedelta(hours=12)
+    return TurnoEnfermera.objects.filter(
+        sede=ubicacion,
+        activo=True,
+        fecha_inicio__gte=hora_limite,
+        fecha_expiracion__gt=now,
+    ).select_related('enfermera').first()
+
+
 class CustomLoginView(LoginView):
     template_name = 'kardex/login.html'
     redirect_authenticated_user = True
+
+    def form_valid(self, form):
+        """
+        Valida turno único de Enfermera:
+        - Si es ENFERMERA, solo puede haber UNA activa por turno de 12h
+        - ADMIN y REGENTE no tienen restricción
+        """
+        user = form.get_user()
+        grupos = user.groups.values_list('name', flat=True)
+
+        if 'ENFERMERA' in grupos:
+            sede = user.perfil.ubicacion_asignada
+            if not sede:
+                form.add_error(None, 'Tu usuario no tiene una sede asignada. Contacta al administrador.')
+                return self.form_invalid(form)
+
+            now = timezone.now()
+            hora_limite = now - timedelta(hours=12)
+
+            # Buscar turnos activos NO expirados de OTRAS enfermeras en la misma sede
+            turno_ocupado = TurnoEnfermera.objects.filter(
+                sede=sede,
+                activo=True,
+                fecha_inicio__gte=hora_limite,
+                fecha_expiracion__gt=now,
+            ).exclude(enfermera=user).first()
+
+            if turno_ocupado:
+                nombre_enfermera = turno_ocupado.enfermera.get_full_name() or turno_ocupado.enfermera.username
+                form.add_error(
+                    None,
+                    f'Ya hay un turno activo de {nombre_enfermera} en {sede.nombre}. '
+                    f'Debe esperar a que finalice su turno (12h desde su inicio) para iniciar sesión.'
+                )
+                return self.form_invalid(form)
+
+            # Turno de la MISMA enfermera: renovar expiración
+            turno_propio, created = TurnoEnfermera.objects.get_or_create(
+                enfermera=user,
+                sede=sede,
+                defaults={
+                    'activo': True,
+                    'fecha_expiracion': now + timedelta(hours=12),
+                }
+            )
+            if not created:
+                turno_propio.fecha_expiracion = now + timedelta(hours=12)
+                turno_propio.activo = True
+                turno_propio.save()
+
+        return super().form_valid(form)
 
     def get_success_url(self):
         """Enruta al usuario según sus grupos (roles) después de un login exitoso"""
@@ -59,8 +127,12 @@ def dashboard_kardex(request):
                 'mensaje': 'Tu usuario no tiene una sede/ubicación asignada. Contacta al administrador.'
             })
 
+        # Enfermera de turno activo en esta sede
+        turno_activo = get_turno_activo(ubicacion_actual)
+
         return render(request, 'kardex/dashboard.html', {
-            'ubicacion': ubicacion_actual
+            'ubicacion': ubicacion_actual,
+            'turno_activo': turno_activo,
         })
 
     except PerfilUsuario.DoesNotExist:
@@ -299,6 +371,7 @@ def admin_dashboard_view(request):
             inventariostock__ubicacion=request.user.perfil.ubicacion_asignada
         ).distinct().order_by('principio_activo'),
         'tipos_medicamento': Medicamento.TIPOS,
+        'turno_activo': get_turno_activo(request.user.perfil.ubicacion_asignada),
     })
 
 

@@ -96,6 +96,29 @@
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('-translate-x-full');
         }
+
+        // Countdown de turno de enfermera (actualiza cada 30s)
+        document.addEventListener('DOMContentLoaded', function() {
+            const el = document.getElementById('turno-countdown') || document.getElementById('turno-countdown-admin');
+            if (!el) return;
+            const expires = new Date(el.dataset.expires).getTime();
+
+            function updateCountdown() {
+                const now = new Date().getTime();
+                const diff = expires - now;
+                if (diff <= 0) {
+                    el.innerText = 'Expirado';
+                    el.style.color = '#dc2626';
+                    return;
+                }
+                const mins = Math.floor(diff / 60000);
+                const hrs = Math.floor(mins / 60);
+                const remainMins = mins % 60;
+                el.innerText = hrs > 0 ? `${hrs}h ${remainMins}m` : `${remainMins} min`;
+            }
+            updateCountdown();
+            setInterval(updateCountdown, 30000);
+        });
     </script>
 </body>
 </html>
