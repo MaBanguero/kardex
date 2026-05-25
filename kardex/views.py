@@ -13,7 +13,7 @@ from datetime import timedelta
 
 # Importamos nuestros modelos y la lógica ACID
 from .models import InventarioStock, PerfilUsuario
-from .services import generar_excel_kardex, registrar_salida_paciente_inteligente, registrar_devolucion_agrupada, procesar_carga_masiva_productos
+from .services import generar_excel_kardex, generar_excel_kardex_consolidado, calcular_semaforo, registrar_salida_paciente_inteligente, registrar_devolucion_agrupada, procesar_carga_masiva_productos
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
@@ -86,6 +86,7 @@ def sincronizar_inventario_api(request):
 
     data = []
     for item in stock:
+        semaforo = calcular_semaforo(item.fecha_vencimiento)
         data.append({
             'id': item.id,
             'medicamento_id': item.medicamento.id,
@@ -100,6 +101,7 @@ def sincronizar_inventario_api(request):
             'cantidad_actual': item.cantidad_actual,
             'stock_minimo': item.stock_minimo,
             'tipo': item.medicamento.tipo,
+            'semaforo': semaforo,
             'busqueda': f"{item.medicamento.principio_activo} {item.lote}".lower(),
             # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
             'en_tramite': item.medicamento.id in meds_pendientes
@@ -151,21 +153,46 @@ def registrar_movimiento_view(request):
 @login_required
 def exportar_kardex_excel(request):
     """
-    Genera el kárdex en formato Excel según el tipo:
-    - MEDICAMENTO → Formato PM-SF-FR12
-    - DISPOSITIVO → Formato PM-SF-FR11
+    Genera el kárdex en formato Excel.
+    Parámetros GET:
+    - tipo: MEDICAMENTO (default) | DISPOSITIVO
+    - sede: ID numérico | 'consolidado' | vacío (usa sede del usuario)
     """
     hoy = datetime.datetime.now()
-    ubicacion_id = request.user.perfil.ubicacion_asignada.id
     tipo = request.GET.get('tipo', 'MEDICAMENTO')
+    sede_param = request.GET.get('sede', '')
 
-    wb = generar_excel_kardex(hoy.month, hoy.year, ubicacion_id, tipo)
+    grupos = request.user.groups.values_list('name', flat=True)
+    es_admin = 'ADMIN' in grupos
 
-    tipo_label = 'Medicamentos' if tipo == 'MEDICAMENTO' else 'Dispositivos'
+    # Modo consolidado: una pestaña por sede (solo admin)
+    if sede_param == 'consolidado':
+        if not es_admin:
+            return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+        wb = generar_excel_kardex_consolidado(hoy.month, hoy.year, tipo)
+        tipo_label = 'Medicamentos' if tipo == 'MEDICAMENTO' else 'Dispositivos'
+        filename = f'Kardex_Consolidado_{tipo_label}_{hoy.strftime("%Y%m%d")}.xlsx'
+
+    # Modo sede específica (admin puede elegir cualquier sede)
+    elif sede_param and sede_param.isdigit():
+        sede_id = int(sede_param)
+        if not es_admin and sede_id != request.user.perfil.ubicacion_asignada.id:
+            return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+        wb = generar_excel_kardex(hoy.month, hoy.year, sede_id, tipo)
+        tipo_label = 'Medicamentos' if tipo == 'MEDICAMENTO' else 'Dispositivos'
+        filename = f'Kardex_{tipo_label}_{hoy.strftime("%Y%m%d")}.xlsx'
+
+    # Modo default: sede del usuario
+    else:
+        ubicacion_id = request.user.perfil.ubicacion_asignada.id
+        wb = generar_excel_kardex(hoy.month, hoy.year, ubicacion_id, tipo)
+        tipo_label = 'Medicamentos' if tipo == 'MEDICAMENTO' else 'Dispositivos'
+        filename = f'Kardex_{tipo_label}_{hoy.strftime("%Y%m%d")}.xlsx'
+
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    response['Content-Disposition'] = f'attachment; filename=Kardex_{tipo_label}_{hoy.strftime("%Y%m%d")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename={filename}'
 
     wb.save(response)
     return response

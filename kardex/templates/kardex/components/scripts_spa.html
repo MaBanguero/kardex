@@ -79,10 +79,32 @@
             grouped[key].fechas.push(item.fecha_vencimiento);
         });
 
+        // Función semáforo cliente-side
+        function semaforoGroup(fechas) {
+            const hoy = new Date();
+            let menorDias = Infinity;
+            fechas.forEach(f => {
+                if (!f) return;
+                const partes = f.split('-');
+                if (partes.length === 3) {
+                    const fDate = new Date(partes[0], partes[1] - 1, partes[2]);
+                    const diff = Math.floor((fDate - hoy) / (1000 * 60 * 60 * 24));
+                    if (diff < menorDias) menorDias = diff;
+                }
+            });
+            if (menorDias === Infinity) return '';
+            if (menorDias < 0) return 'VENCIDO';
+            if (menorDias < 30) return 'ROJO';
+            if (menorDias < 90) return 'NARANJA';
+            if (menorDias < 180) return 'AMARILLO';
+            return 'VERDE';
+        }
+
         // Convertimos Sets a Textos
         const resultados = Object.values(grouped).map(g => {
             g.lote_txt = g.lotes_set.size > 1 ? `${g.lotes_set.size} Lotes distintos` : Array.from(g.lotes_set)[0];
             g.fecha_txt = g.fechas.length > 1 ? 'Múltiples Fechas (FEFO)' : g.fechas[0];
+            g.semaforo = semaforoGroup(g.fechas);
             return g;
         });
 
@@ -101,6 +123,7 @@
         items.forEach(i => {
             const low = i.cantidad_actual <= i.stock_minimo;
             const badge = `<span class="text-[10px] font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded shadow-sm text-slate-600"><i class="fas fa-layer-group mr-1 opacity-50"></i>${i.lote_txt}</span>`;
+            const semaforoBadge = i.semaforo ? `<span class="semaforo-badge semaforo-${i.semaforo.toLowerCase()}">${i.semaforo}</span>` : '';
 
             mHtml += `
             <div class="p-6 border-b border-slate-100">
@@ -110,7 +133,7 @@
                 </div>
                 <div class="flex gap-3 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div class="flex-1"><p class="text-[9px] font-bold text-slate-400 mb-1">LOTE</p>${badge}</div>
-                    <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VENCE</p><p class="text-[11px] font-bold text-slate-600">${i.fecha_txt}</p></div>
+                    <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VENCE</p><p class="text-[11px] font-bold text-slate-600">${i.fecha_txt}</p>${semaforoBadge}</div>
                 </div>
                <button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}')" class="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition">Registrar Movimiento</button>
             </div>`;
@@ -118,7 +141,7 @@
             dHtml += `
             <tr class="hover:bg-slate-50 transition">
                 <td class="px-6 py-5"><p class="font-bold text-slate-800">${i.principio_activo}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
-                <td class="px-6 py-5">${badge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
+                <td class="px-6 py-5">${badge}${semaforoBadge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
                 <td class="px-6 py-5 text-center"><span id="stock-qty-${i.id_virtual}" class="text-2xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></td>
                 <td class="px-6 py-5 text-right"><button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}')" class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
             </tr>`;

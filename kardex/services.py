@@ -324,19 +324,42 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
         raise ValidationError(str(e))
 
 
+def calcular_semaforo(fecha_vencimiento):
+    """
+    Calcula el color de semáforo INVIMA según la Resolución 3100 de 2019.
+    Retorna VERDE | AMARILLO | NARANJA | ROJO | VENCIDO.
+    """
+    if not fecha_vencimiento:
+        return ''
+    if hasattr(fecha_vencimiento, 'date'):
+        fecha_venc = fecha_vencimiento.date()
+    else:
+        fecha_venc = fecha_vencimiento
+
+    dias_restantes = (fecha_venc - datetime.date.today()).days
+
+    if dias_restantes < 0:
+        return 'VENCIDO'
+    elif dias_restantes < 30:
+        return 'ROJO'
+    elif dias_restantes < 90:
+        return 'NARANJA'
+    elif dias_restantes < 180:
+        return 'AMARILLO'
+    else:
+        return 'VERDE'
+
+
 def generar_excel_kardex(mes, anio, ubicacion_id, tipo='MEDICAMENTO'):
     if tipo == 'DISPOSITIVO':
         return generar_excel_dispositivos(mes, anio, ubicacion_id)
     return generar_excel_medicamentos(mes, anio, ubicacion_id)
 
 
-def generar_excel_medicamentos(mes, anio, ubicacion_id):
-    """Formato PM-SF-FR12: KARDEX DE MEDICAMENTOS"""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "KARDEX"
-
-    hoy = datetime.datetime.now()
+def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
+    """Escribe contenido del kardex de medicamentos en un worksheet existente."""
+    if hoy is None:
+        hoy = datetime.datetime.now()
     ubicacion = Ubicacion.objects.get(id=ubicacion_id)
     unidad_nombre = ubicacion.nombre
 
@@ -492,6 +515,8 @@ def generar_excel_medicamentos(mes, anio, ubicacion_id):
         ws.row_dimensions[fila_actual].height = 20
         m = data['stock'].medicamento; stock = data['stock']
 
+        semaforo = calcular_semaforo(stock.fecha_vencimiento)
+
         # Columnas: ITEM, PRINCIPIO ACTIVO, FORMA FARM., CONCENTRACIÓN,
         # PRESENTACIÓN COMERCIAL, LOTE, FECHA VTO, UNIDAD MEDIDA,
         # REG INVIMA, SEMAFORIZACIÓN, LASA
@@ -505,13 +530,29 @@ def generar_excel_medicamentos(mes, anio, ubicacion_id):
             stock.fecha_vencimiento.strftime("%d/%m/%Y"),
             getattr(m, 'unidad_medida', ''),  # UNIDAD DE MEDIDA
             m.registro_invima or '',
-            '',  # SEMAFORIZACIÓN
+            semaforo,  # SEMAFORIZACIÓN
             '',  # MEDICAMENTO LASA
         ]
         for col_idx, valor in enumerate(datos_fila, start=1):
             celda = ws.cell(row=fila_actual, column=col_idx, value=valor)
             celda.font = fuente_normal
             celda.alignment = alineacion_centro if col_idx not in [2, 3] else alineacion_izq
+
+        # Colorear celda de semáforo
+        colores_semaforo = {
+            'VENCIDO': 'FF0000', 'ROJO': 'FF4444',
+            'NARANJA': 'FF8800', 'AMARILLO': 'FFDD00',
+            'VERDE': '44BB44'
+        }
+        color_hex = colores_semaforo.get(semaforo, '')
+        if color_hex:
+            ws.cell(row=fila_actual, column=10).fill = PatternFill(
+                start_color=color_hex, end_color=color_hex, fill_type='solid'
+            )
+            ws.cell(row=fila_actual, column=10).font = Font(
+                bold=True, size=9, name='Arial',
+                color='FFFFFF' if semaforo in ('VENCIDO', 'ROJO', 'NARANJA', 'VERDE') else '000000'
+            )
 
         ws.cell(row=fila_actual, column=col_saldo_ini, value=data['saldo_inicial']).alignment = alineacion_centro
         c_ing = col_ingresos_start
@@ -532,16 +573,21 @@ def generar_excel_medicamentos(mes, anio, ubicacion_id):
         fila_actual += 1
 
     ws.freeze_panes = 'A9'
+
+
+def generar_excel_medicamentos(mes, anio, ubicacion_id):
+    """Formato PM-SF-FR12: KARDEX DE MEDICAMENTOS"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "KARDEX"
+    _write_medicamentos_kardex(ws, mes, anio, ubicacion_id)
     return wb
 
 
-def generar_excel_dispositivos(mes, anio, ubicacion_id):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "CONTROL DE DM E INSUMOS"
-
-    # 0. Obtener Contexto
-    hoy = datetime.datetime.now()
+def _write_dispositivos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
+    """Escribe contenido del kardex de dispositivos médicos en un worksheet existente."""
+    if hoy is None:
+        hoy = datetime.datetime.now()
     ubicacion = Ubicacion.objects.get(id=ubicacion_id)
     unidad_nombre = ubicacion.nombre
 
@@ -649,12 +695,6 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
     ws['D1'].font = fuente_titulo
     ws['D1'].alignment = alineacion_centro
 
-    info_pares = [
-        ('AF1', 'Código:', 'AG1', 'PM-SF-FR11'),
-        ('AF2', 'Versión:', 'AG2', '1'),
-        ('AF3', 'Fecha de Actualización:', 'AG3', '12.05.2025'),
-    ]
-    # 'AF' = col 32, 'AG' = col 33
     ws['AF1'] = 'Código:'; ws['AG1'] = 'PM-SF-FR11'
     ws['AF2'] = 'Versión:'; ws['AG2'] = '1'
     ws['AF3'] = 'Fecha de Actualización:'; ws['AG3'] = '12.05.2025'
@@ -707,11 +747,6 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
         celda.fill = fondo_gris
         celda.border = borde_fino
         ws.cell(row=7, column=col).border = borde_fino
-
-    # Sub-encabezados de MARCA y LOTE (fila 7 headers de sub-columna)
-    # En el Excel original, fila 6 tiene los títulos principales y fila 7 tiene MARCA y LOTE repetidos
-    # para los sub-encabezados de la sección de INGRESOS/EGRESOS
-    ws.cell(row=6, column=3, value='').font = fuente_negrita  # lo reemplazamos por merged
 
     # Sección SALDOS
     rango_saldo_ini = f"{get_column_letter(COL_SALDO_INI)}6:{get_column_letter(COL_SALDO_INI)}7"
@@ -800,6 +835,8 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
         # Clasificación de riesgo según INVIMA: I, IIa, IIb, III
         clasif = getattr(m, 'clasificacion_riesgo', '')
 
+        semaforo = calcular_semaforo(stock.fecha_vencimiento)
+
         datos_fila = {
             COL_ITEM: idx,
             COL_DESCRIPCION: f"{m.principio_activo} {m.concentracion or ''}".strip(),
@@ -810,7 +847,7 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
             COL_VIDA_UTIL: getattr(m, 'vida_util', ''),
             COL_LOTE: stock.lote,
             COL_FECHA_VENCE: stock.fecha_vencimiento.strftime('%Y-%m-%d') if stock.fecha_vencimiento else '',
-            COL_SEMAFORIZACION: '',
+            COL_SEMAFORIZACION: semaforo,
             COL_CLASIF_RIESGO: clasif,
         }
 
@@ -819,6 +856,22 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
             celda.font = fuente_normal
             celda.alignment = alineacion_centro if col not in [COL_DESCRIPCION, COL_PRESENTACION] else alineacion_izq
             celda.border = borde_fino
+
+        # Colorear celda de semáforo
+        colores_semaforo = {
+            'VENCIDO': 'FF0000', 'ROJO': 'FF4444',
+            'NARANJA': 'FF8800', 'AMARILLO': 'FFDD00',
+            'VERDE': '44BB44'
+        }
+        color_hex = colores_semaforo.get(semaforo, '')
+        if color_hex:
+            ws.cell(row=fila_actual, column=COL_SEMAFORIZACION).fill = PatternFill(
+                start_color=color_hex, end_color=color_hex, fill_type='solid'
+            )
+            ws.cell(row=fila_actual, column=COL_SEMAFORIZACION).font = Font(
+                bold=True, size=9, name='Arial',
+                color='FFFFFF' if semaforo in ('VENCIDO', 'ROJO', 'NARANJA', 'VERDE') else '000000'
+            )
 
         # Saldo Inicial
         ws.cell(row=fila_actual, column=COL_SALDO_INI, value=data['saldo_inicial']).font = fuente_normal
@@ -836,17 +889,14 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
             ws.cell(row=fila_actual, column=c_ing + 1).font = fuente_normal
             ws.cell(row=fila_actual, column=c_ing + 1).border = borde_fino
             c_ing += 2
-        # Llenar celdas de ingreso restantes con borde
         for c in range(COL_ING_START, COL_ING_END + 1):
             if ws.cell(row=fila_actual, column=c).value is None:
                 ws.cell(row=fila_actual, column=c).border = borde_fino
 
-        # Total Ingresos
         ws.cell(row=fila_actual, column=COL_TOTAL_ING, value=data['total_ingresos']).alignment = alineacion_centro
         ws.cell(row=fila_actual, column=COL_TOTAL_ING).font = fuente_negrita
         ws.cell(row=fila_actual, column=COL_TOTAL_ING).border = borde_fino
 
-        # Egresos dinámicos
         c_eg = COL_EGR_START
         for mov in data['egresos']:
             ws.cell(row=fila_actual, column=c_eg,
@@ -857,25 +907,20 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
             ws.cell(row=fila_actual, column=c_eg + 1).font = fuente_normal
             ws.cell(row=fila_actual, column=c_eg + 1).border = borde_fino
             c_eg += 2
-        # Llenar celdas de egreso restantes con borde
         for c in range(COL_EGR_START, COL_EGR_END + 1):
             if ws.cell(row=fila_actual, column=c).value is None:
                 ws.cell(row=fila_actual, column=c).border = borde_fino
 
-        # Total Egresos
         ws.cell(row=fila_actual, column=COL_TOTAL_EGR, value=data['total_egresos']).alignment = alineacion_centro
         ws.cell(row=fila_actual, column=COL_TOTAL_EGR).font = fuente_negrita
         ws.cell(row=fila_actual, column=COL_TOTAL_EGR).border = borde_fino
 
-        # Saldo Final
         ws.cell(row=fila_actual, column=COL_SALDO_FIN, value=data['saldo_final']).alignment = alineacion_centro
         ws.cell(row=fila_actual, column=COL_SALDO_FIN).font = fuente_negrita
         ws.cell(row=fila_actual, column=COL_SALDO_FIN).border = borde_fino
 
-        # Verificación (vacía para llenado manual)
         ws.cell(row=fila_actual, column=COL_VERIFICACION).border = borde_fino
 
-        # Borde completo de la fila (columnas base que no tuvieron borde aun)
         for c in range(1, COL_SALDO_INI):
             if ws.cell(row=fila_actual, column=c).border is None or not ws.cell(row=fila_actual, column=c).border.left.style:
                 ws.cell(row=fila_actual, column=c).border = borde_fino
@@ -894,8 +939,38 @@ def generar_excel_dispositivos(mes, anio, ubicacion_id):
     ws.cell(row=fila_actual, column=10, value="FECHA:").font = fuente_negrita
     ws.cell(row=fila_actual, column=11, value=hoy.strftime("%d/%m/%Y")).font = fuente_normal
 
-    # Congelar paneles
     ws.freeze_panes = 'A8'
+
+
+def generar_excel_dispositivos(mes, anio, ubicacion_id):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CONTROL DE DM E INSUMOS"
+    _write_dispositivos_kardex(ws, mes, anio, ubicacion_id)
+    return wb
+
+
+def generar_excel_kardex_consolidado(mes, anio, tipo='MEDICAMENTO'):
+    """
+    Genera un workbook con una pestaña (sheet) por cada sede.
+    Cada pestaña contiene el kardex completo de esa sede.
+    """
+    wb = Workbook()
+    default_ws = wb.active
+    sedes = Ubicacion.objects.all().order_by('nombre')
+
+    for idx, sede in enumerate(sedes):
+        if idx == 0:
+            ws = default_ws
+        else:
+            ws = wb.create_sheet()
+        # Excel sheet names max 31 chars
+        ws.title = sede.nombre[:31]
+
+        if tipo == 'DISPOSITIVO':
+            _write_dispositivos_kardex(ws, mes, anio, sede.id)
+        else:
+            _write_medicamentos_kardex(ws, mes, anio, sede.id)
 
     return wb
 
