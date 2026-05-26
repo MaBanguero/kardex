@@ -54,4 +54,11 @@ urlpatterns = [
     path('api/cancelar-solicitud/', views.api_cancelar_solicitud, name='api_cancelar_solicitud'),
     path('api/eliminar-stock/', views.api_eliminar_stock, name='api_eliminar_stock'),
     path('api/eliminar-usuario/', views.api_eliminar_usuario, name='api_eliminar_usuario'),
+
+    # ==========================================
+    # 5. CONCILIACIÓN RIPS
+    # ==========================================
+    path('conciliacion/', views.conciliacion_lista, name='conciliacion_lista'),
+    path('conciliacion/<int:conciliacion_id>/', views.conciliacion_detalle, name='conciliacion_detalle'),
+    path('conciliacion/<int:conciliacion_id>/exportar/', views.conciliacion_exportar_excel, name='conciliacion_exportar'),
 ]

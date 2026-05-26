@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     PerfilUsuario, ConfiguracionSistema, Medicamento,
-    Ubicacion, InventarioStock, Documento, DocumentoDetalle, TurnoEnfermera
+    Ubicacion, InventarioStock, Documento, DocumentoDetalle, TurnoEnfermera,
+    CargaRIPS, RegistroRIPS, Conciliacion, DetalleConciliacion, MapeoRIPSMedicamento
 )
 
 class DocumentoDetalleInline(admin.TabularInline):
@@ -54,6 +55,65 @@ class MedicamentoAdmin(admin.ModelAdmin):
 
 admin.site.register(ConfiguracionSistema)
 admin.site.register(Ubicacion)
+
+
+# ==============================================================================
+# RIPS y Conciliación
+# ==============================================================================
+
+
+@admin.register(MapeoRIPSMedicamento)
+class MapeoRIPSMedicamentoAdmin(admin.ModelAdmin):
+    list_display = ('medicamento', 'cups_codigo', 'nombre_rips', 'gruposervicio', 'activo')
+    list_filter = ('activo', 'gruposervicio')
+    search_fields = ('medicamento__principio_activo', 'cups_codigo', 'nombre_rips')
+    autocomplete_fields = ['medicamento']
+
+
+@admin.register(RegistroRIPS)
+class RegistroRIPSAdmin(admin.ModelAdmin):
+    list_display = ('nombreprocedimiento', 'gruposervicio', 'identificacion_paciente',
+                    'nombre_paciente', 'fechaprocedimiento', 'medicamento_mapeado')
+    list_filter = ('gruposervicio', 'carga', 'fechaprocedimiento')
+    search_fields = ('nombreprocedimiento', 'identificacion_paciente', 'nombre_paciente')
+    date_hierarchy = 'fechaprocedimiento'
+
+
+@admin.register(CargaRIPS)
+class CargaRIPSAdmin(admin.ModelAdmin):
+    list_display = ('archivo', 'fecha_carga', 'periodo_inicio', 'periodo_fin',
+                    'total_registros', 'registros_medicamentos', 'estado')
+    list_filter = ('estado', 'fecha_carga')
+    date_hierarchy = 'fecha_carga'
+
+
+class DetalleConciliacionInline(admin.TabularInline):
+    model = DetalleConciliacion
+    extra = 0
+    can_delete = False
+    fields = ('estado', 'medicamento_nombre', 'paciente_identificacion', 'cantidad_kardex', 'cantidad_rips', 'observacion')
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Conciliacion)
+class ConciliacionAdmin(admin.ModelAdmin):
+    list_display = ('fecha_conciliacion', 'periodo_inicio', 'periodo_fin',
+                    'coincidencias', 'no_facturados', 'no_despachados', 'resumen')
+    list_filter = ('fecha_conciliacion',)
+    date_hierarchy = 'fecha_conciliacion'
+    inlines = [DetalleConciliacionInline]
+
+    @admin.display(description='Resumen')
+    def resumen(self, obj):
+        total = obj.coincidencias + obj.no_facturados + obj.no_despachados
+        if total == 0:
+            return "Sin datos"
+        ok = obj.coincidencias * 100 // total if total else 0
+        color = "🟢" if ok >= 90 else "🟡" if ok >= 70 else "🔴"
+        return f"{color} {ok}% de acierto"
 
 
 @admin.register(TurnoEnfermera)

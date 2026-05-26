@@ -1,0 +1,122 @@
+{% extends 'kardex/base.html' %}
+{% block title %}Detalle Conciliación{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'conciliacion_lista' %}">Conciliaciones</a></li>
+            <li class="breadcrumb-item active">Detalle</li>
+        </ol>
+    </nav>
+
+    <h1 class="mb-4">📋 Conciliación del {{ conciliacion.periodo_inicio|date:"d/m/Y" }} al {{ conciliacion.periodo_fin|date:"d/m/Y" }}</h1>
+
+    <!-- Resumen -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-bg-success">
+                <div class="card-body text-center">
+                    <h3 class="mb-0">{{ conciliacion.coincidencias }}</h3>
+                    <small>✅ Coincidencias</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-danger">
+                <div class="card-body text-center">
+                    <h3 class="mb-0">{{ conciliacion.no_facturados }}</h3>
+                    <small>❌ No Facturados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-warning">
+                <div class="card-body text-center">
+                    <h3 class="mb-0">{{ conciliacion.no_despachados }}</h3>
+                    <small>⚠️ No Despachados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-info">
+                <div class="card-body text-center">
+                    <h3 class="mb-0">{{ conciliacion.total_salidas_kardex }}</h3>
+                    <small>📦 Kardex</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label class="form-label">Filtrar por estado:</label>
+                </div>
+                <div class="col-auto">
+                    <select name="estado" class="form-select" onchange="this.form.submit()">
+                        <option value="">Todos</option>
+                        <option value="COINCIDE" {% if estado_filtro == 'COINCIDE' %}selected{% endif %}>✅ Coincide</option>
+                        <option value="NO_FACTURADO" {% if estado_filtro == 'NO_FACTURADO' %}selected{% endif %}>❌ No Facturado</option>
+                        <option value="NO_DESPACHADO" {% if estado_filtro == 'NO_DESPACHADO' %}selected{% endif %}>⚠️ No Despachado</option>
+                        <option value="CANTIDAD_DIF" {% if estado_filtro == 'CANTIDAD_DIF' %}selected{% endif %}>🔄 Cantidad Diferente</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <a href="{% url 'conciliacion_exportar' conciliacion.id %}" class="btn btn-success">
+                        📥 Exportar Excel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detalles -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Estado</th>
+                            <th>Medicamento</th>
+                            <th>Paciente ID</th>
+                            <th>Paciente</th>
+                            <th>Cant. Kardex</th>
+                            <th>Cant. RIPS</th>
+                            <th>Fecha</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for det in detalles %}
+                        <tr class="{% if det.estado == 'NO_FACTURADO' %}table-danger{% elif det.estado == 'NO_DESPACHADO' %}table-warning{% elif det.estado == 'COINCIDE' %}table-success{% endif %}">
+                            <td>
+                                {% if det.estado == 'COINCIDE' %}✅
+                                {% elif det.estado == 'NO_FACTURADO' %}❌
+                                {% elif det.estado == 'NO_DESPACHADO' %}⚠️
+                                {% elif det.estado == 'CANTIDAD_DIF' %}🔄
+                                {% endif %}
+                                {{ det.get_estado_display }}
+                            </td>
+                            <td>{{ det.medicamento_nombre }}</td>
+                            <td>{{ det.paciente_identificacion }}</td>
+                            <td>{{ det.paciente_nombre }}</td>
+                            <td class="text-center">{{ det.cantidad_kardex }}</td>
+                            <td class="text-center">{{ det.cantidad_rips }}</td>
+                            <td>{{ det.fecha|date:"d/m/Y H:i" }}</td>
+                            <td><small class="text-muted">{{ det.observacion }}</small></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No hay detalles en esta conciliación.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

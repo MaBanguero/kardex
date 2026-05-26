@@ -17,6 +17,8 @@ from .services import generar_excel_kardex, generar_excel_kardex_consolidado, ca
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 
 def get_turno_activo(ubicacion):
@@ -951,3 +953,138 @@ def api_eliminar_usuario(request):
         return JsonResponse({'status': 'error', 'mensaje': 'Usuario no encontrado.'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# VISTAS DE CONCILIACIÓN RIPS
+# ==============================================================================
+
+
+@login_required
+def conciliacion_lista(request):
+    """Listado de conciliaciones realizadas"""
+    from .models import Conciliacion, CargaRIPS
+
+    conciliaciones = Conciliacion.objects.all().select_related('carga_rips')[:20]
+    cargas_sin_conciliar = CargaRIPS.objects.filter(estado='CARGADA')
+
+    return render(request, 'kardex/conciliacion_lista.html', {
+        'conciliaciones': conciliaciones,
+        'cargas_sin_conciliar': cargas_sin_conciliar,
+    })
+
+
+@login_required
+def conciliacion_detalle(request, conciliacion_id):
+    """Detalle de una conciliación"""
+    from .models import Conciliacion, DetalleConciliacion
+
+    conciliacion = Conciliacion.objects.get(id=conciliacion_id)
+    estado_filtro = request.GET.get('estado', '')
+
+    detalles = DetalleConciliacion.objects.filter(conciliacion=conciliacion)
+    if estado_filtro:
+        detalles = detalles.filter(estado=estado_filtro)
+    detalles = detalles.order_by('-fecha')[:100]
+
+    return render(request, 'kardex/conciliacion_detalle.html', {
+        'conciliacion': conciliacion,
+        'detalles': detalles,
+        'estado_filtro': estado_filtro,
+    })
+
+
+@login_required
+def conciliacion_exportar_excel(request, conciliacion_id):
+    """Exporta las discrepancias de una conciliación a Excel"""
+    from .models import Conciliacion, DetalleConciliacion
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+
+    conciliacion = Conciliacion.objects.get(id=conciliacion_id)
+    detalles = DetalleConciliacion.objects.filter(conciliacion=conciliacion)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Conciliación"
+
+    fuente_titulo = Font(bold=True, size=14, name='Arial')
+    fuente_header = Font(bold=True, size=10, name='Arial', color='FFFFFF')
+    fuente_normal = Font(size=10, name='Arial')
+    alineacion_centro = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    alineacion_izq = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    borde_fino = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    fondo_rojo = PatternFill(start_color='FEE2E2', end_color='FEE2E2', fill_type='solid')
+    fondo_verde = PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid')
+    fondo_amarillo = PatternFill(start_color='FEF9C3', end_color='FEF9C3', fill_type='solid')
+    fondo_header = PatternFill(start_color='2563EB', end_color='2563EB', fill_type='solid')
+
+    ws.merge_cells('A1:H1')
+    ws['A1'] = f'CONCILIACIÓN KARDEX vs RIPS - {conciliacion.periodo_inicio} a {conciliacion.periodo_fin}'
+    ws['A1'].font = fuente_titulo
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    row = 3
+    ws.cell(row=row, column=1, value='RESUMEN').font = Font(bold=True, size=12)
+    row = 4
+    ws.cell(row=row, column=1, value='Total Kardex:'); ws.cell(row=row, column=2, value=conciliacion.total_salidas_kardex)
+    row = 5
+    ws.cell(row=row, column=1, value='Total RIPS:'); ws.cell(row=row, column=2, value=conciliacion.total_registros_rips)
+    row = 6
+    ws.cell(row=row, column=1, value='Coincidencias:'); ws.cell(row=row, column=2, value=conciliacion.coincidencias)
+    row = 7
+    ws.cell(row=row, column=1, value='No Facturados:'); ws.cell(row=row, column=2, value=conciliacion.no_facturados)
+    row = 8
+    ws.cell(row=row, column=1, value='No Despachados:'); ws.cell(row=row, column=2, value=conciliacion.no_despachados)
+
+    row_start = 10
+    headers = ['Estado', 'Medicamento', 'Paciente ID', 'Paciente',
+               'Cant. Kardex', 'Cant. RIPS', 'Fecha', 'Observacion']
+    for col, h in enumerate(headers, 1):
+        celda = ws.cell(row=row_start, column=col, value=h)
+        celda.font = fuente_header
+        celda.alignment = alineacion_centro
+        celda.fill = fondo_header
+        celda.border = borde_fino
+
+    for i, det in enumerate(detalles, start=row_start + 1):
+        colores = {
+            'COINCIDE': fondo_verde,
+            'NO_FACTURADO': fondo_rojo,
+            'NO_DESPACHADO': fondo_amarillo,
+            'CANTIDAD_DIF': fondo_amarillo,
+        }
+        ws.cell(row=i, column=1, value=dict(DetalleConciliacion.ESTADOS).get(det.estado, det.estado))
+        ws.cell(row=i, column=1).fill = colores.get(det.estado, fondo_verde)
+        ws.cell(row=i, column=2, value=det.medicamento_nombre)
+        ws.cell(row=i, column=3, value=det.paciente_identificacion)
+        ws.cell(row=i, column=4, value=det.paciente_nombre)
+        ws.cell(row=i, column=5, value=det.cantidad_kardex)
+        ws.cell(row=i, column=6, value=det.cantidad_rips)
+        ws.cell(row=i, column=7, value=det.fecha.strftime('%Y-%m-%d %H:%M') if det.fecha else '')
+        ws.cell(row=i, column=8, value=det.observacion)
+
+        for col in range(1, 9):
+            celda = ws.cell(row=i, column=col)
+            celda.font = fuente_normal
+            celda.alignment = alineacion_centro if col in (1, 3, 5, 6, 7) else alineacion_izq
+            celda.border = borde_fino
+
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 40
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 30
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 18
+    ws.column_dimensions['H'].width = 50
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename=conciliacion_{conciliacion.id}.xlsx'
+    wb.save(response)
+    return response

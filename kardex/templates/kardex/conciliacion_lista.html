@@ -1,0 +1,89 @@
+{% extends 'kardex/base.html' %}
+{% block title %}Conciliación RIPS{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">📊 Conciliación Kardex vs RIPS</h1>
+
+    <!-- Cargas pendientes -->
+    {% if cargas_sin_conciliar %}
+    <div class="alert alert-info">
+        <strong>📂 Cargas pendientes de conciliar:</strong>
+        <ul class="mb-0 mt-2">
+            {% for carga in cargas_sin_conciliar %}
+            <li>
+                {{ carga.archivo }} ({{ carga.periodo_inicio }} a {{ carga.periodo_fin }})
+                — {{ carga.registros_medicamentos }} registros
+                <span class="badge bg-warning text-dark">{{ carga.estado }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Conciliaciones realizadas -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Conciliaciones Realizadas</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Periodo</th>
+                            <th>Kardex</th>
+                            <th>RIPS</th>
+                            <th>✅ Coinciden</th>
+                            <th>❌ No Facturados</th>
+                            <th>⚠️ No Despachados</th>
+                            <th>% Acierto</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in conciliaciones %}
+                        <tr>
+                            <td>{{ c.fecha_conciliacion|date:"d/m/Y H:i" }}</td>
+                            <td>{{ c.periodo_inicio|date:"d/m/Y" }} - {{ c.periodo_fin|date:"d/m/Y" }}</td>
+                            <td>{{ c.total_salidas_kardex }}</td>
+                            <td>{{ c.total_registros_rips }}</td>
+                            <td class="text-success fw-bold">{{ c.coincidencias }}</td>
+                            <td class="text-danger fw-bold">{{ c.no_facturados }}</td>
+                            <td class="text-warning fw-bold">{{ c.no_despachados }}</td>
+                            <td>
+                                {% with total=c.coincidencias|add:c.no_facturados|add:c.no_despachados %}
+                                {% if total > 0 %}
+                                {% with pct=c.coincidencias|floatformat:0 %}
+                                {% with c.coincidencias|divisibleby:total as div_result %}
+                                <span class="badge {% if c.coincidencias >= total|floatformat:0|add:0 %}bg-success{% elif c.coincidencias >= total|add:0 %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ c.coincidencias }} / {{ total }}
+                                </span>
+                                {% endwith %}
+                                {% endwith %}
+                                {% else %}
+                                <span class="badge bg-secondary">Sin datos</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                <a href="{% url 'conciliacion_detalle' c.id %}" class="btn btn-sm btn-outline-primary">Ver</a>
+                                <a href="{% url 'conciliacion_exportar' c.id %}" class="btn btn-sm btn-outline-success">Excel</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">
+                                No hay conciliaciones realizadas aún.
+                                Cargá un reporte RIPS con:
+                                <code class="d-block mt-2">python manage.py cargar_rips --ultimo-dia</code>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

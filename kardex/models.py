@@ -150,6 +150,175 @@ class DocumentoDetalle(models.Model):
         return f"{self.cantidad}x {self.medicamento.codigo} (Lote: {self.lote})"
 
 
+class MapeoRIPSMedicamento(models.Model):
+    """
+    Mapea un medicamento del Kardex a uno o más códigos CUPS/nombres del RIPS.
+    Permite que la conciliación automática sepa qué medicamento del Kardex
+    corresponde a qué procedimiento en el reporte RIPS.
+    """
+    medicamento = models.ForeignKey(
+        'Medicamento', on_delete=models.CASCADE, related_name='mapeos_rips'
+    )
+    cups_codigo = models.CharField(
+        max_length=20, blank=True,
+        help_text="Código CUPS del RIPS (ej: 70005, 70174)"
+    )
+    nombre_rips = models.CharField(
+        max_length=500, blank=True,
+        help_text="Nombre del procedimiento en RIPS (ej: ACETAMINOFEN 500 MG TABLETA)"
+    )
+    gruposervicio = models.CharField(
+        max_length=50, blank=True,
+        help_text="Grupo de servicio (MEDICAMENTO, SERVICIO FARMACEUTICO, INSUMOS)"
+    )
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Mapeo RIPS - Medicamento'
+        verbose_name_plural = 'Mapeos RIPS - Medicamentos'
+        unique_together = ('medicamento', 'cups_codigo', 'nombre_rips')
+
+    def __str__(self):
+        return f"{self.medicamento.principio_activo} -> {self.nombre_rips or self.cups_codigo}"
+
+
+class CargaRIPS(models.Model):
+    """
+    Registro de cada archivo RIPS (reporte201) cargado al sistema.
+    """
+    ESTADOS = [
+        ('CARGADA', 'Cargada'),
+        ('CONCILIADA', 'Conciliada'),
+        ('ERROR', 'Error'),
+    ]
+
+    archivo = models.CharField(max_length=500, help_text="Nombre del archivo original")
+    fecha_carga = models.DateTimeField(auto_now_add=True)
+    periodo_inicio = models.DateField(help_text="Fecha inicio del reporte")
+    periodo_fin = models.DateField(help_text="Fecha fin del reporte")
+    total_registros = models.PositiveIntegerField(default=0)
+    registros_medicamentos = models.PositiveIntegerField(default=0, help_text="Solo MEDICAMENTO + SERVICIO FARMACEUTICO + INSUMOS")
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='CARGADA')
+
+    class Meta:
+        verbose_name = 'Carga RIPS'
+        verbose_name_plural = 'Cargas RIPS'
+        ordering = ['-fecha_carga']
+
+    def __str__(self):
+        return f"RIPS {self.periodo_inicio} a {self.periodo_fin} ({self.total_registros} registros)"
+
+
+class RegistroRIPS(models.Model):
+    """
+    Cada fila del reporte201 que corresponde a medicamentos/insumos.
+    """
+    carga = models.ForeignKey(CargaRIPS, on_delete=models.CASCADE, related_name='registros')
+
+    # Datos del CSV
+    gruposervicio = models.CharField(max_length=100, db_index=True)
+    cupscodigo = models.CharField(max_length=20, db_index=True)
+    nombreprocedimiento = models.CharField(max_length=500)
+    cantidad = models.PositiveIntegerField(default=1)
+    valorunitario = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    valortotal = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    identificacion_paciente = models.CharField(max_length=50, db_index=True)
+    nombre_paciente = models.CharField(max_length=300, blank=True, default='')
+    identificacion_profesional = models.CharField(max_length=50, blank=True, default='')
+    nombre_profesional = models.CharField(max_length=300, blank=True, default='')
+    especialidad = models.CharField(max_length=200, blank=True, default='')
+    fechaprocedimiento = models.DateTimeField(null=True, blank=True, db_index=True)
+    numerofactura = models.CharField(max_length=100, blank=True, default='')
+    sede = models.CharField(max_length=200, blank=True, default='')
+    admision = models.CharField(max_length=100, blank=True, default='')
+    modalidad = models.CharField(max_length=50, blank=True, default='')
+    diagnostico = models.CharField(max_length=20, blank=True, default='')
+    diagnosticonombre = models.CharField(max_length=300, blank=True, default='')
+
+    # Para conciliación
+    medicamento_mapeado = models.ForeignKey(
+        Medicamento, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="Medicamento del Kardex con el que se mapeó automáticamente"
+    )
+
+    class Meta:
+        verbose_name = 'Registro RIPS'
+        verbose_name_plural = 'Registros RIPS'
+        indexes = [
+            models.Index(fields=['identificacion_paciente', 'fechaprocedimiento']),
+        ]
+
+    def __str__(self):
+        return f"{self.nombreprocedimiento} - {self.nombre_paciente} ({self.fechaprocedimiento.date() if self.fechaprocedimiento else '?'})"
+
+
+class Conciliacion(models.Model):
+    """
+    Resultado de la conciliación entre Kardex (SALIDAS) y RIPS.
+    """
+    carga_rips = models.ForeignKey(CargaRIPS, on_delete=models.CASCADE, related_name='conciliaciones')
+    fecha_conciliacion = models.DateTimeField(auto_now_add=True)
+    periodo_inicio = models.DateField()
+    periodo_fin = models.DateField()
+
+    # Totales
+    total_salidas_kardex = models.PositiveIntegerField(default=0, help_text="Total de SALIDAS en el Kardex")
+    total_medicamentos_kardex = models.PositiveIntegerField(default=0, help_text="Suma de cantidades de SALIDAS")
+    total_registros_rips = models.PositiveIntegerField(default=0)
+    total_cantidad_rips = models.PositiveIntegerField(default=0)
+
+    # Resultados
+    coincidencias = models.PositiveIntegerField(default=0)
+    no_facturados = models.PositiveIntegerField(default=0, help_text="En Kardex pero no en RIPS")
+    no_despachados = models.PositiveIntegerField(default=0, help_text="En RIPS pero no en Kardex")
+
+    class Meta:
+        verbose_name = 'Conciliación'
+        verbose_name_plural = 'Conciliaciones'
+        ordering = ['-fecha_conciliacion']
+
+    def __str__(self):
+        return f"Conciliación {self.periodo_inicio} a {self.periodo_fin} - {self.coincidencias} OK, {self.no_facturados} no facturados"
+
+
+class DetalleConciliacion(models.Model):
+    """
+    Cada ítem de la conciliación (coincidencia o discrepancia).
+    """
+    ESTADOS = [
+        ('COINCIDE', '✅ Coincide'),
+        ('NO_FACTURADO', '❌ No Facturado'),
+        ('NO_DESPACHADO', '⚠️ No Despachado'),
+        ('CANTIDAD_DIF', '🔄 Cantidad Diferente'),
+    ]
+
+    conciliacion = models.ForeignKey(Conciliacion, on_delete=models.CASCADE, related_name='detalles')
+    estado = models.CharField(max_length=20, choices=ESTADOS, db_index=True)
+
+    # Referencias
+    documento_salida = models.ForeignKey(Documento, on_delete=models.SET_NULL, null=True, blank=True)
+    registro_rips = models.ForeignKey(RegistroRIPS, on_delete=models.SET_NULL, null=True, blank=True)
+    medicamento = models.ForeignKey(Medicamento, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Datos para reporte
+    medicamento_nombre = models.CharField(max_length=300)
+    paciente_identificacion = models.CharField(max_length=50, blank=True, default='')
+    paciente_nombre = models.CharField(max_length=300, blank=True, default='')
+    cantidad_kardex = models.PositiveIntegerField(default=0)
+    cantidad_rips = models.PositiveIntegerField(default=0)
+    fecha = models.DateTimeField()
+    sede = models.CharField(max_length=200, blank=True, default='')
+    profesional = models.CharField(max_length=300, blank=True, default='')
+    observacion = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Detalle de Conciliación'
+        verbose_name_plural = 'Detalles de Conciliación'
+
+    def __str__(self):
+        return f"{self.get_estado_display()} - {self.medicamento_nombre} ({self.paciente_nombre})"
+
+
 class TurnoEnfermera(models.Model):
     """
     Control de turno único por sede para enfermeras.
