@@ -84,6 +84,8 @@ class Medicamento(models.Model):
                                             choices=[('I', 'I - Bajo'), ('IIa', 'IIa - Medio'),
                                                      ('IIb', 'IIb - Medio-Alto'), ('III', 'III - Alto')],
                                             help_text="Clasificación de riesgo INVIMA: I, IIa, IIb, III")
+    cups_codigo = models.CharField(max_length=20, null=True, blank=True,
+                                   help_text="Código CUPS del RIPS (ej: 70005, 70174). Se usa para conciliación automática.")
 
     def __str__(self):
         conc = f" {self.concentracion}" if self.concentracion else ""

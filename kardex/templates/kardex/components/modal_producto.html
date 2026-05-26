@@ -50,6 +50,10 @@
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código / CUM</label>
                             <input type="text" id="prod-codigo" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-slate-600" placeholder="Opcional">
                         </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Código CUPS (RIPS)</label>
+                            <input type="text" id="prod-cups" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-slate-600" placeholder="Ej: 70005">
+                        </div>
                         <div id="field-forma">
                             <label id="lbl-forma" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Forma Farmacéutica *</label>
                             <input type="text" id="prod-forma" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Ej: Tableta">
@@ -198,6 +202,7 @@
         toggleTipoProducto();
         document.getElementById('prod-nombre').value = item.principio_activo || "";
         document.getElementById('prod-codigo').value = item.codigo || "";
+        document.getElementById('prod-cups').value = item.cups_codigo || "";
         document.getElementById('prod-forma').value = item.forma_farmaceutica || "";
         document.getElementById('prod-concentracion').value = item.concentracion || "";
         document.getElementById('prod-presentacion').value = item.presentacion || "";
@@ -226,6 +231,7 @@
             id: prodId, tipo: tipo,
             principio_activo: document.getElementById('prod-nombre').value,
             codigo: document.getElementById('prod-codigo').value,
+            cups_codigo: document.getElementById('prod-cups').value,
             forma_farmaceutica: formaVal,
             concentracion: document.getElementById('prod-concentracion').value,
             presentacion: document.getElementById('prod-presentacion').value,

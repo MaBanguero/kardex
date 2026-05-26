@@ -176,6 +176,7 @@ def sincronizar_inventario_api(request):
             'stock_minimo': item.stock_minimo,
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
+            'cups_codigo': item.medicamento.cups_codigo or '',
             'busqueda': f"{item.medicamento.principio_activo} {item.lote}".lower(),
             # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
             'en_tramite': item.medicamento.id in meds_pendientes
@@ -446,6 +447,7 @@ def api_gestion_producto(request):
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
             medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
             medicamento.clasificacion_riesgo = data.get('clasificacion_riesgo', medicamento.clasificacion_riesgo)
+            medicamento.cups_codigo = data.get('cups_codigo', medicamento.cups_codigo) or None
             medicamento.save()
 
             lote_ingresado = data.get('lote').strip().upper()

@@ -1298,6 +1298,20 @@ def procesar_importacion_rips(archivo_csv, periodo_inicio=None, periodo_fin=None
 
 
 def _mapear_medicamentos_rips(carga):
+    """
+    Mapea registros RIPS a medicamentos del Kardex en este orden:
+    1. Por cups_codigo directo del Medicamento (exacto contra cupscodigo del RIPS)
+    2. Por MapeoRIPSMedicamento explícito (cups_codigo + nombre_rips + gruposervicio)
+    3. Por texto: principio_activo dentro del nombre del procedimiento RIPS
+    """
+    # 1. Matching directo por CUPS code en el medicamento
+    for med in _Medicamento.objects.exclude(cups_codigo__isnull=True).exclude(cups_codigo__exact=''):
+        _RegistroRIPS.objects.filter(
+            carga=carga, cupscodigo=med.cups_codigo,
+            medicamento_mapeado__isnull=True
+        ).update(medicamento_mapeado=med)
+
+    # 2. Mapeos explícitos
     mapeos = _Mapeo.objects.filter(activo=True)
     for m in mapeos:
         f = {}
@@ -1308,8 +1322,10 @@ def _mapear_medicamentos_rips(carga):
         if m.gruposervicio:
             f['gruposervicio__iexact'] = m.gruposervicio
         if f:
+            f['medicamento_mapeado__isnull'] = True
             _RegistroRIPS.objects.filter(carga=carga, **f).update(medicamento_mapeado=m.medicamento)
 
+    # 3. Matching por principio activo en texto
     for r in _RegistroRIPS.objects.filter(carga=carga, medicamento_mapeado__isnull=True):
         n = r.nombreprocedimiento.upper()
         for m in _Medicamento.objects.all():
