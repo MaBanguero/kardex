@@ -410,6 +410,10 @@ def api_gestion_producto(request):
             if not principio_activo:
                 raise ValueError('El principio activo/nombre es obligatorio.')
 
+            cups_codigo = data.get('cups_codigo', '').strip()
+            if not cups_codigo:
+                raise ValueError('El código CUPS (RIPS) es obligatorio para todos los productos.')
+
             forma_farmaceutica = data.get('forma_farmaceutica', '').strip().upper()
 
             if tipo_val == 'DISPOSITIVO':
@@ -447,7 +451,7 @@ def api_gestion_producto(request):
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
             medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
             medicamento.clasificacion_riesgo = data.get('clasificacion_riesgo', medicamento.clasificacion_riesgo)
-            medicamento.cups_codigo = data.get('cups_codigo', medicamento.cups_codigo) or None
+            medicamento.cups_codigo = cups_codigo
             medicamento.save()
 
             lote_ingresado = data.get('lote').strip().upper()

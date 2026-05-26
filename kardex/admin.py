@@ -50,8 +50,9 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
 
 @admin.register(Medicamento)
 class MedicamentoAdmin(admin.ModelAdmin):
-    list_display = ('codigo', 'principio_activo', 'forma_farmaceutica', 'registro_invima')
-    search_fields = ('codigo', 'principio_activo')
+    list_display = ('codigo', 'principio_activo', 'forma_farmaceutica', 'cups_codigo', 'registro_invima')
+    search_fields = ('codigo', 'principio_activo', 'cups_codigo')
+    list_filter = ('tipo',)
 
 admin.site.register(ConfiguracionSistema)
 admin.site.register(Ubicacion)

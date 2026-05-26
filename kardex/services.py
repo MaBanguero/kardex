@@ -1002,6 +1002,10 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
             principio = row.get('principio_activo', '').strip().upper()
 
+            cups_codigo = row.get('cups_codigo', '').strip()
+            if not cups_codigo:
+                raise ValueError(f"El código CUPS es obligatorio. Fila: '{principio}'")
+
             if tipo == 'DISPOSITIVO':
                 forma = 'NO APLICA'
                 medicamento, _ = Medicamento.objects.get_or_create(
@@ -1021,6 +1025,8 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
             medicamento.presentacion = row.get('presentacion', '')
             medicamento.laboratorio = row.get('laboratorio', '')
             medicamento.registro_invima = row.get('registro_invima', '')
+
+            medicamento.cups_codigo = cups_codigo
 
             if tipo == 'MEDICAMENTO':
                 medicamento.concentracion = row.get('concentracion', '')
@@ -1088,36 +1094,36 @@ def generar_plantilla_xlsx():
 
     encabezados = [
         "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
-        "presentacion", "laboratorio", "codigo", "registro_invima",
-        "vida_util", "clasificacion_riesgo",
+        "presentacion", "laboratorio", "codigo", "cups_codigo",
+        "registro_invima", "vida_util", "clasificacion_riesgo",
         "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
     ]
 
     # Ejemplo medicamento
     ejemplo_med = [
         "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
-        "CAJA X 10", "GENFAR", "770123456", "2020M-0012345",
-        "", "",
+        "CAJA X 10", "GENFAR", "770123456", "70005",
+        "2020M-0012345", "", "",
         "LOTE001", "2026-12-31", "100", "20"
     ]
 
     # Ejemplo dispositivo
     ejemplo_disp = [
         "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
-        "CAJA X 100", "ECOPIEL", "", "INVIMA-2025E-001234",
-        "3 AÑOS", "I",
+        "CAJA X 100", "ECOPIEL", "", "70905",
+        "INVIMA-2025E-001234", "3 AÑOS", "I",
         "LOTE002", "2027-06-30", "500", "50"
     ]
 
     # Hoja informativa (fila 1)
-    ws.merge_cells('A1:N1')
+    ws.merge_cells('A1:O1')
     ws['A1'] = "PLANTILLA DE CARGA MASIVA - KARDEX FARMACIA"
     ws['A1'].font = Font(bold=True, size=14, name='Arial', color='1E3A8A')
     ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
-    ws.merge_cells('A2:N2')
-    ws['A2'] = "Complete los datos. Las columnas marcadas con HEADER AZUL son obligatorias segun el tipo. Borre las filas de ejemplo antes de importar."
+    ws.merge_cells('A2:O2')
+    ws['A2'] = "Complete los datos. Todas las columnas con HEADER AZUL son obligatorias. Borre las filas de ejemplo antes de importar."
     ws['A2'].font = Font(size=9, name='Arial', italic=True, color='64748B')
     ws['A2'].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
     ws.row_dimensions[2].height = 25
@@ -1135,10 +1141,11 @@ def generar_plantilla_xlsx():
     # Ejemplo MEDICAMENTO (fila 5)
     row_med = 5
     ws.row_dimensions[row_med].height = 22
+    cols_centradas = {1, 4, 12, 13, 14, 15}
     for col_idx, valor in enumerate(ejemplo_med, start=1):
         celda = ws.cell(row=row_med, column=col_idx, value=valor)
         celda.font = fuente_normal
-        celda.alignment = alineacion_centro if col_idx in (1, 4, 11, 12, 13, 14) else alineacion_izq
+        celda.alignment = alineacion_centro if col_idx in cols_centradas else alineacion_izq
         celda.fill = fondo_ejemplo_med
         celda.border = borde_fino
 
@@ -1148,14 +1155,14 @@ def generar_plantilla_xlsx():
     for col_idx, valor in enumerate(ejemplo_disp, start=1):
         celda = ws.cell(row=row_disp, column=col_idx, value=valor)
         celda.font = fuente_normal
-        celda.alignment = alineacion_centro if col_idx in (1, 4, 11, 12, 13, 14) else alineacion_izq
+        celda.alignment = alineacion_centro if col_idx in cols_centradas else alineacion_izq
         celda.fill = fondo_ejemplo_disp
         celda.border = borde_fino
 
     # Anchos de columna
     anchos = {'A': 14, 'B': 30, 'C': 20, 'D': 14, 'E': 18, 'F': 16,
-              'G': 14, 'H': 22, 'I': 10, 'J': 20, 'K': 12, 'L': 18,
-              'M': 10, 'N': 12}
+              'G': 14, 'H': 16, 'I': 22, 'J': 10, 'K': 20,
+              'L': 12, 'M': 18, 'N': 10, 'O': 12}
     for letra, ancho in anchos.items():
         ws.column_dimensions[letra].width = ancho
 
