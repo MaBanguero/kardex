@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     PerfilUsuario, ConfiguracionSistema, Medicamento,
-    Ubicacion, InventarioStock, Documento, DocumentoDetalle
+    Ubicacion, InventarioStock, Documento, DocumentoDetalle, TurnoEnfermera
 )
 
 class DocumentoDetalleInline(admin.TabularInline):
@@ -54,3 +54,20 @@ class MedicamentoAdmin(admin.ModelAdmin):
 
 admin.site.register(ConfiguracionSistema)
 admin.site.register(Ubicacion)
+
+
+@admin.register(TurnoEnfermera)
+class TurnoEnfermeraAdmin(admin.ModelAdmin):
+    list_display = ('enfermera', 'sede', 'fecha_inicio', 'fecha_expiracion', 'activo', 'estado_turno')
+    list_filter = ('activo', 'sede', 'fecha_inicio')
+    search_fields = ('enfermera__username', 'enfermera__first_name', 'enfermera__last_name', 'sede__nombre')
+    date_hierarchy = 'fecha_inicio'
+
+    @admin.display(description='Estado')
+    def estado_turno(self, obj):
+        if obj.is_expired():
+            return "⏰ Expirado"
+        if not obj.activo:
+            return "❌ Inactivo"
+        mins = obj.expires_in_minutes()
+        return f"✅ Activo ({mins} min restantes)"
