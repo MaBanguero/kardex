@@ -1163,3 +1163,253 @@ def generar_plantilla_xlsx():
     ws.freeze_panes = 'A5'
 
     return wb
+
+
+# ==============================================================================
+# SERVICIOS DE CONCILIACIÓN RIPS
+# ==============================================================================
+
+import io as _io
+import csv as _csv
+import datetime as _dt
+import re as _re
+from django.utils import timezone as _tz
+from django.db import transaction as _tx
+from django.db.models import Sum as _Sum
+from .models import (
+    CargaRIPS as _CargaRIPS, RegistroRIPS as _RegistroRIPS,
+    Conciliacion as _Conciliacion, DetalleConciliacion as _DetalleConciliacion,
+    MapeoRIPSMedicamento as _Mapeo, Medicamento as _Medicamento,
+    Documento as _Documento, DocumentoDetalle as _DocDetalle
+)
+
+
+_GRUPOS_MED = frozenset({'MEDICAMENTO', 'SERVICIO FARMACEUTICO', 'INSUMOS'})
+
+
+def _parse_decimal(v):
+    try:
+        return float(str(v).replace(',', '.'))
+    except (ValueError, AttributeError):
+        return 0
+
+
+def procesar_importacion_rips(archivo_csv, periodo_inicio=None, periodo_fin=None, sede_filter=''):
+    """
+    Procesa un archivo CSV reporte201 y guarda en RegistroRIPS.
+    Retorna: (CargaRIPS, mensaje, success)
+    """
+    if hasattr(archivo_csv, 'read'):
+        content = archivo_csv.read()
+        if isinstance(content, bytes):
+            content = content.decode('utf-8-sig')
+        io_string = _io.StringIO(content)
+    else:
+        io_string = _io.StringIO(archivo_csv)
+
+    reader = _csv.DictReader(io_string, delimiter='\t')
+    if not reader.fieldnames:
+        return None, 'El CSV no tiene cabeceras o el delimitador no es tab', False
+
+    if not periodo_inicio:
+        periodo_inicio = _tz.now().date().replace(day=1)
+    if not periodo_fin:
+        periodo_fin = _tz.now().date()
+
+    nombre_archivo = getattr(archivo_csv, 'name', 'upload_report_rips.csv')
+    if hasattr(archivo_csv, 'name'):
+        nombre_archivo = archivo_csv.name
+
+    with _tx.atomic():
+        carga = _CargaRIPS.objects.create(
+            archivo=nombre_archivo.replace('\\', '/').split('/')[-1],
+            periodo_inicio=periodo_inicio,
+            periodo_fin=periodo_fin,
+        )
+
+        total = medicamentos = 0
+        registros_batch = []
+        BATCH = 1000
+
+        for row in reader:
+            total += 1
+            gruposervicio = row.get('gruposervicio', '').strip().upper()
+            sede = row.get('sedehabilitacion', '').strip()
+
+            if sede_filter and sede_filter.upper() not in sede.upper():
+                continue
+            if gruposervicio not in _GRUPOS_MED:
+                continue
+
+            fecha_str = row.get('fechaprocedimiento', '').strip()
+            fecha = None
+            if fecha_str:
+                try:
+                    na = _dt.datetime.strptime(fecha_str, '%Y-%m-%d %H:%M:%S')
+                    fecha = _tz.make_aware(na, _dt.timezone(_dt.timedelta(hours=-5)))
+                except ValueError:
+                    try:
+                        fecha = _dt.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        pass
+
+            registros_batch.append(_RegistroRIPS(
+                carga=carga,
+                gruposervicio=gruposervicio,
+                cupscodigo=row.get('cupscodigo', '').strip(),
+                nombreprocedimiento=row.get('nombreprocedimiento', '').strip(),
+                cantidad=int(row.get('cantidad', 0) or 0),
+                valorunitario=_parse_decimal(row.get('valorunidad', '0')),
+                valortotal=_parse_decimal(row.get('valortotal', '0')),
+                identificacion_paciente=row.get('identificacion', '').strip(),
+                nombre_paciente=row.get('nombrecompleto', '').strip(),
+                identificacion_profesional=row.get('identificacionprofesional', '').strip(),
+                nombre_profesional=row.get('nombreprofesional', '').strip(),
+                especialidad=row.get('especialidad', '').strip(),
+                fechaprocedimiento=fecha,
+                numerofactura=row.get('numerofactura', '').strip(),
+                sede=sede,
+                admision=row.get('admision', '').strip(),
+                modalidad=row.get('modalidad', '').strip(),
+                diagnostico=row.get('diagnostico', '').strip(),
+                diagnosticonombre=row.get('diagnosticonombre', '').strip(),
+            ))
+            medicamentos += 1
+
+            if len(registros_batch) >= BATCH:
+                _RegistroRIPS.objects.bulk_create(registros_batch, ignore_conflicts=True)
+                registros_batch = []
+
+        if registros_batch:
+            _RegistroRIPS.objects.bulk_create(registros_batch, ignore_conflicts=True)
+
+        carga.total_registros = total
+        carga.registros_medicamentos = medicamentos
+
+        if medicamentos == 0:
+            carga.estado = 'ERROR'
+            carga.save()
+            return carga, 'No se encontraron registros de medicamentos en el archivo', False
+
+        carga.save()
+
+    _mapear_medicamentos_rips(carga)
+    return carga, f'Cargados {medicamentos} registros de medicamentos/insumos (de {total} totales)', True
+
+
+def _mapear_medicamentos_rips(carga):
+    mapeos = _Mapeo.objects.filter(activo=True)
+    for m in mapeos:
+        f = {}
+        if m.cups_codigo:
+            f['cupscodigo'] = m.cups_codigo
+        if m.nombre_rips:
+            f['nombreprocedimiento__iexact'] = m.nombre_rips
+        if m.gruposervicio:
+            f['gruposervicio__iexact'] = m.gruposervicio
+        if f:
+            _RegistroRIPS.objects.filter(carga=carga, **f).update(medicamento_mapeado=m.medicamento)
+
+    for r in _RegistroRIPS.objects.filter(carga=carga, medicamento_mapeado__isnull=True):
+        n = r.nombreprocedimiento.upper()
+        for m in _Medicamento.objects.all():
+            if m.principio_activo.upper() in n:
+                r.medicamento_mapeado = m
+                r.save(update_fields=['medicamento_mapeado'])
+                break
+
+
+def ejecutar_conciliacion(carga):
+    """Ejecuta conciliación Kardex vs RIPS y retorna la Conciliacion creada"""
+    pi, pf = carga.periodo_inicio, carga.periodo_fin
+
+    salidas = _Documento.objects.filter(
+        tipo_mov='SALIDA', fecha__date__gte=pi, fecha__date__lte=pf
+    ).select_related('origen', 'usuario').prefetch_related('detalles__medicamento')
+
+    salidas_dict, tot_cant_k = {}, 0
+    for doc in salidas:
+        for det in doc.detalles.all():
+            tot_cant_k += det.cantidad
+            k = (doc.id_paciente or '', doc.fecha.date(), det.medicamento.principio_activo.upper())
+            salidas_dict.setdefault(k, []).append({'doc': doc, 'det': det, 'cant': det.cantidad})
+
+    rips = _RegistroRIPS.objects.filter(carga=carga)
+    tot_rips = rips.count()
+    tot_cant_r = rips.aggregate(t=_Sum('cantidad'))['t'] or 0
+
+    rips_dict = {}
+    for r in rips:
+        f = r.fechaprocedimiento.date() if r.fechaprocedimiento else pi
+        rips_dict.setdefault((r.identificacion_paciente, f, r.nombreprocedimiento.upper().strip()), []).append(r)
+
+    with _tx.atomic():
+        conc = _Conciliacion.objects.create(
+            carga_rips=carga, periodo_inicio=pi, periodo_fin=pf,
+            total_salidas_kardex=salidas.count(), total_medicamentos_kardex=tot_cant_k,
+            total_registros_rips=tot_rips, total_cantidad_rips=tot_cant_r,
+        )
+
+        ok, nf, nd, batch = 0, 0, 0, []
+
+        for (paci, fech, med_nom), items in salidas_dict.items():
+            tk = sum(i['cant'] for i in items)
+            hallado = False
+            for kr, regs in list(rips_dict.items()):
+                p, fr, nr = kr
+                if paci != p: continue
+                if abs((fech - fr).days) > 1: continue
+                if med_nom not in nr and nr not in med_nom: continue
+                hallado = True
+                tr = sum(r.cantidad for r in regs)
+                for i in items:
+                    ed = 'COINCIDE' if i['cant'] == tr else 'CANTIDAD_DIF'
+                    batch.append(_DetalleConciliacion(
+                        conciliacion=conc, estado=ed, documento_salida=i['doc'],
+                        medicamento_nombre=i['det'].medicamento.principio_activo,
+                        paciente_identificacion=paci, paciente_nombre=regs[0].nombre_paciente,
+                        cantidad_kardex=i['cant'], cantidad_rips=tr,
+                        fecha=i['doc'].fecha,
+                        sede=i['doc'].origen.nombre if i['doc'].origen else '',
+                        profesional=i['doc'].usuario.get_full_name() or i['doc'].usuario.username,
+                        observacion='OK' if i['cant'] == tr else f"K: {i['cant']} vs R: {tr}",
+                    ))
+                ok += 1 if i['cant'] == tr else 0
+                nf += 0 if i['cant'] == tr else 1
+                del rips_dict[kr]; break
+            if not hallado:
+                for i in items:
+                    batch.append(_DetalleConciliacion(
+                        conciliacion=conc, estado='NO_FACTURADO',
+                        documento_salida=i['doc'],
+                        medicamento_nombre=i['det'].medicamento.principio_activo,
+                        paciente_identificacion=paci, cantidad_kardex=i['cant'],
+                        cantidad_rips=0, fecha=i['doc'].fecha,
+                        sede=i['doc'].origen.nombre if i['doc'].origen else '',
+                        profesional=i['doc'].usuario.get_full_name() or i['doc'].usuario.username,
+                        observacion='Dispensado en Kardex pero NO en RIPS',
+                    ))
+                nf += len(items)
+
+        for kr, regs in rips_dict.items():
+            for r in regs:
+                batch.append(_DetalleConciliacion(
+                    conciliacion=conc, estado='NO_DESPACHADO', registro_rips=r,
+                    medicamento_nombre=r.nombreprocedimiento,
+                    paciente_identificacion=r.identificacion_paciente,
+                    paciente_nombre=r.nombre_paciente,
+                    cantidad_kardex=0, cantidad_rips=r.cantidad,
+                    fecha=r.fechaprocedimiento or _tz.now(), sede=r.sede,
+                    profesional=r.nombre_profesional,
+                    observacion='Facturado en RIPS pero NO en Kardex',
+                ))
+            nd += len(regs)
+
+        if batch:
+            _DetalleConciliacion.objects.bulk_create(batch, batch_size=1000)
+
+        conc.coincidencias = ok; conc.no_facturados = nf
+        conc.no_despachados = nd; conc.save()
+
+    carga.estado = 'CONCILIADA'; carga.save()
+    return conc

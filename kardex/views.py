@@ -12,7 +12,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 # Importamos nuestros modelos y la lógica ACID
-from .models import InventarioStock, PerfilUsuario
+from .models import InventarioStock, PerfilUsuario, Conciliacion
 from .services import generar_excel_kardex, generar_excel_kardex_consolidado, calcular_semaforo, registrar_salida_paciente_inteligente, registrar_devolucion_agrupada, procesar_carga_masiva_productos, generar_plantilla_xlsx
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import Group
@@ -374,6 +374,7 @@ def admin_dashboard_view(request):
         ).distinct().order_by('principio_activo'),
         'tipos_medicamento': Medicamento.TIPOS,
         'turno_activo': get_turno_activo(request.user.perfil.ubicacion_asignada),
+        'conciliaciones': Conciliacion.objects.select_related('carga_rips').order_by('-fecha_conciliacion')[:5],
     })
 
 
@@ -953,6 +954,52 @@ def api_eliminar_usuario(request):
         return JsonResponse({'status': 'error', 'mensaje': 'Usuario no encontrado.'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# API: CARGA RIPS (desde la web)
+# ==============================================================================
+
+
+@login_required
+@require_POST
+def api_cargar_rips(request):
+    """Sube y procesa el reporte201 RIPS desde la web"""
+    grupos = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos:
+        return JsonResponse({'status': 'error', 'mensaje': 'Solo ADMIN puede cargar RIPS'}, status=403)
+
+    if 'archivo_rips' not in request.FILES:
+        return JsonResponse({'status': 'error', 'mensaje': 'No se envió ningún archivo'}, status=400)
+
+    archivo = request.FILES['archivo_rips']
+    if not archivo.name.endswith('.csv'):
+        return JsonResponse({'status': 'error', 'mensaje': 'El archivo debe ser .csv'}, status=400)
+
+    try:
+        from .services import procesar_importacion_rips, ejecutar_conciliacion
+
+        carga, mensaje, success = procesar_importacion_rips(archivo)
+        if not success:
+            return JsonResponse({'status': 'error', 'mensaje': mensaje})
+
+        conciliacion = ejecutar_conciliacion(carga)
+
+        return JsonResponse({
+            'status': 'success',
+            'mensaje': mensaje,
+            'conciliacion_id': conciliacion.id,
+            'data': {
+                'coincidencias': conciliacion.coincidencias,
+                'no_facturados': conciliacion.no_facturados,
+                'no_despachados': conciliacion.no_despachados,
+                'total_kardex': conciliacion.total_salidas_kardex,
+                'total_rips': conciliacion.total_registros_rips,
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=500)
 
 
 # ==============================================================================

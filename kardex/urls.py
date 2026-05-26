@@ -54,6 +54,7 @@ urlpatterns = [
     path('api/cancelar-solicitud/', views.api_cancelar_solicitud, name='api_cancelar_solicitud'),
     path('api/eliminar-stock/', views.api_eliminar_stock, name='api_eliminar_stock'),
     path('api/eliminar-usuario/', views.api_eliminar_usuario, name='api_eliminar_usuario'),
+    path('api/cargar-rips/', views.api_cargar_rips, name='api_cargar_rips'),
 
     # ==========================================
     # 5. CONCILIACIÓN RIPS
