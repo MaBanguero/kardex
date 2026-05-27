@@ -1,10 +1,13 @@
 <div id="modal-usuario-container" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
-    <div class="flex min-h-full items-center justify-center p-0 sm:p-4">
-        <div id="modal-usuario-box" class="w-full sm:max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col transform scale-95 opacity-0 duration-300">
+    <div class="flex min-h-full items-end sm:items-center justify-center p-0">
+        <div id="modal-usuario-box" class="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col transform translate-y-full sm:translate-y-0 sm:scale-95 opacity-0 duration-300">
             <!-- Header sticky -->
-            <div class="sticky top-0 z-10 bg-slate-50 rounded-2xl sm:rounded-3xl border-b border-slate-100">
+            <div class="sticky top-0 z-10 bg-white rounded-t-3xl sm:rounded-3xl border-b border-slate-100">
                 <div class="flex justify-between items-center p-4 sm:p-6">
-                    <h3 id="user-modal-title" class="font-black text-slate-800 text-sm sm:text-base">Gestión de Colaborador</h3>
+                    <div>
+                        <h3 id="user-modal-title" class="font-black text-slate-800 text-base sm:text-lg">Gestión de Colaborador</h3>
+                        <p class="text-[10px] text-slate-400 font-bold mt-0.5 sm:hidden">Desliza para cerrar</p>
+                    </div>
                     <button type="button" onclick="cerrarModalUsuario()" class="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition flex-shrink-0">
                         <i class="fas fa-times text-lg"></i>
                     </button>
@@ -16,61 +19,61 @@
                 {% csrf_token %}
                 <input type="hidden" id="user-id">
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Login (Username)</label>
-                        <input type="text" id="u-username" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
-                    </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Login (Username)</label>
+                    <input type="text" id="u-username" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                </div>
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nombres</label>
-                        <input type="text" id="u-fname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none">
+                        <input type="text" id="u-fname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none">
                     </div>
 
                     <div>
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Apellidos</label>
-                        <input type="text" id="u-lname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none">
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Correo Electrónico</label>
-                        <input type="email" id="u-email" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="usuario@hospital.com">
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Cédula / Identificación</label>
-                        <input type="text" id="u-identificacion" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-mono font-bold text-blue-700">
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Roles y Permisos</label>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200" id="contenedor-roles">
-                            {% for rol in roles %}
-                            <label class="flex items-center gap-3 p-3 bg-white rounded-xl border border-transparent hover:border-blue-200 cursor-pointer transition shadow-sm active:scale-[0.97]">
-                                <input type="checkbox" name="roles_usuario" value="{{ rol.name }}" class="w-5 h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
-                                <span class="text-xs font-bold text-slate-700">{{ rol.name }}</span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Sede Asignada</label>
-                        <select id="u-sede" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-4 focus:ring-blue-500/10 transition font-bold text-slate-700">
-                            {% for s in sedes %}
-                            <option value="{{ s.id }}">{{ s.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nueva Contraseña</label>
-                        <input type="password" id="u-pass" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Opcional en edición">
+                        <input type="text" id="u-lname" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none">
                     </div>
                 </div>
 
-                <div class="py-2 sm:pt-2 sm:pb-0">
-                    <button type="submit" id="btn-save-user" class="w-full bg-blue-600 text-white py-4 rounded-xl sm:rounded-2xl font-black text-sm sm:text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all active:scale-95">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Correo Electrónico</label>
+                    <input type="email" id="u-email" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="usuario@hospital.com">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Cédula / Identificación</label>
+                    <input type="text" id="u-identificacion" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-mono font-bold text-blue-700">
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Roles y Permisos</label>
+                    <div class="flex flex-col sm:grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200" id="contenedor-roles">
+                        {% for rol in roles %}
+                        <label class="flex items-center gap-3 p-3.5 sm:p-3 bg-white rounded-xl border border-transparent hover:border-blue-200 cursor-pointer transition shadow-sm active:scale-[0.97]">
+                            <input type="checkbox" name="roles_usuario" value="{{ rol.name }}" class="w-5 h-5 sm:w-5 sm:h-5 text-blue-600 rounded-lg border-slate-300 focus:ring-blue-500/20">
+                            <span class="text-sm sm:text-xs font-bold text-slate-700">{{ rol.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Sede Asignada</label>
+                    <select id="u-sede" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm outline-none focus:ring-4 focus:ring-blue-500/10 transition font-bold text-slate-700">
+                        {% for s in sedes %}
+                        <option value="{{ s.id }}">{{ s.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nueva Contraseña</label>
+                    <input type="password" id="u-pass" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-3 text-base sm:text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Opcional en edición">
+                </div>
+
+                <div class="sticky bottom-0 bg-white pb-1 pt-2 sm:pt-2 sm:pb-0">
+                    <button type="submit" id="btn-save-user" class="w-full bg-blue-600 text-white py-4 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all active:scale-95">
                         Guardar Cambios
                     </button>
                 </div>
@@ -89,11 +92,16 @@
         document.getElementById('u-username').disabled = false;
         document.getElementById('user-modal-title').innerText = "Nuevo Colaborador";
         uCont.classList.replace('hidden', 'flex');
-        setTimeout(() => uBox.classList.remove('scale-95', 'opacity-0'), 10);
+        // Animación: en mobile slide-up, en desktop scale
+        setTimeout(() => {
+            uBox.classList.remove('translate-y-full', 'sm:translate-y-0', 'sm:scale-95', 'opacity-0');
+            uBox.classList.add('translate-y-0', 'sm:scale-100', 'opacity-100');
+        }, 10);
     }
 
     function cerrarModalUsuario() {
-        uBox.classList.add('scale-95', 'opacity-0');
+        uBox.classList.add('opacity-0');
+        uBox.classList.add('translate-y-full', 'sm:translate-y-0', 'sm:scale-95');
         setTimeout(() => uCont.classList.replace('flex', 'hidden'), 300);
     }
 
@@ -112,6 +120,18 @@
             cb.checked = item.roles.includes(cb.value);
         });
     }
+
+    // Cerrar con swipe hacia abajo en mobile
+    let touchStartY = 0;
+    uBox.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    uBox.addEventListener('touchmove', (e) => {
+        const diff = e.touches[0].clientY - touchStartY;
+        if (diff > 80 && uBox.scrollTop <= 0) {
+            cerrarModalUsuario();
+        }
+    }, { passive: true });
 
     document.getElementById('form-usuario').addEventListener('submit', function(e) {
         e.preventDefault();
