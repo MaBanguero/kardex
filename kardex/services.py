@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from .models import Documento, DocumentoDetalle, InventarioStock, Ubicacion, Medicamento, PerfilUsuario
 from django.contrib.auth.models import User, Group
-import io, csv
+import io, csv, re
 import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
@@ -1008,12 +1008,55 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
       vida_util, clasificacion_riesgo,
       lote, fecha_vencimiento, cantidad, stock_minimo
     """
+    def _normalizar_fecha(texto):
+        """Convierte fechas en múltiples formatos a YYYY-MM-DD"""
+        if not texto:
+            return ''
+        texto = texto.strip()
+        # Si ya está en formato ISO
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', texto):
+            return texto
+        # DD/MM/YYYY o D/M/YYYY
+        match = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})$', texto)
+        if match:
+            d, m, y = match.groups()
+            return f'{y}-{int(m):02d}-{int(d):02d}'
+        # DD-MM-YYYY
+        match = re.match(r'^(\d{1,2})-(\d{1,2})-(\d{4})$', texto)
+        if match:
+            d, m, y = match.groups()
+            return f'{y}-{int(m):02d}-{int(d):02d}'
+        # MM/DD/YYYY (formato US, poco comun)
+        match = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})$', texto)
+        if match:
+            # Asumir DD/MM/YYYY
+            d, m, y = match.groups()
+            return f'{y}-{int(m):02d}-{int(d):02d}'
+        return texto
+
     if not usuario.groups.filter(name='ADMIN').exists():
         raise PermissionError("No tienes permisos para realizar cargas masivas.")
 
     decoded_file = archivo_csv.read().decode('utf-8')
-    io_string = io.StringIO(decoded_file)
-    reader = csv.DictReader(io_string)
+    lines = decoded_file.split('\n')
+
+    # Buscar la línea de encabezado real (la que empieza con 'tipo')
+    header_idx = None
+    for i, line in enumerate(lines):
+        if line.strip().lower().startswith('tipo'):
+            header_idx = i
+            break
+
+    if header_idx is None:
+        raise ValueError('No se encontró la fila de encabezados (debe comenzar con "tipo").')
+
+    # Reconstruir el CSV desde el encabezado real
+    csv_body = '\n'.join(lines[header_idx:])
+    reader = csv.DictReader(io.StringIO(csv_body))
+
+    # Normalizar nombres de columnas: 'cum' → 'codigo'
+    if reader.fieldnames and 'cum' in reader.fieldnames and 'codigo' not in reader.fieldnames:
+        reader.fieldnames = ['codigo' if f == 'cum' else f for f in reader.fieldnames]
 
     contador = 0
     with transaction.atomic():
@@ -1067,12 +1110,13 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
             if not lote:
                 continue  # saltar filas sin lote
 
+            fecha_vto = _normalizar_fecha(row.get('fecha_vencimiento', row.get('vencimiento', '')))
             stock, _ = InventarioStock.objects.get_or_create(
                 ubicacion=usuario.perfil.ubicacion_asignada,
                 medicamento=medicamento,
                 lote=lote,
                 defaults={
-                    'fecha_vencimiento': row.get('fecha_vencimiento', row.get('vencimiento', '')),
+                    'fecha_vencimiento': fecha_vto,
                     'cantidad_actual': 0,
                     'stock_minimo': int(row.get('stock_minimo', 10))
                 }

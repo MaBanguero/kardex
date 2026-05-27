@@ -716,6 +716,15 @@ def api_carga_masiva_usuarios(request):
             import csv
             import io
             decoded = archivo.read().decode('utf-8-sig')
+            # Buscar fila de encabezado real (empieza con 'nombre')
+            lines = decoded.split('\n')
+            header_idx = None
+            for i, line in enumerate(lines):
+                if line.strip().lower().startswith('nombre'):
+                    header_idx = i
+                    break
+            if header_idx is not None:
+                decoded = '\n'.join(lines[header_idx:])
             reader = csv.DictReader(io.StringIO(decoded))
             for row in reader:
                 nombre = (row.get('nombre') or '').strip()
