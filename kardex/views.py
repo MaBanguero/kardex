@@ -641,9 +641,9 @@ def descargar_plantilla_usuarios(request):
         import io
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(['nombre', 'documento'])
-        writer.writerow(['Ejemplo Nombre', '1234567890'])
-        writer.writerow(['', ''])  # fila vacía de referencia
+        writer.writerow(['nombre', 'documento', 'rol'])
+        writer.writerow(['Ejemplo Enfermera', '1234567890', 'ENFERMERA'])
+        writer.writerow(['Ejemplo Regente', '987654321', 'REGENTE'])
         content = output.getvalue()
         response = HttpResponse(content, content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename={filename}'
@@ -653,11 +653,13 @@ def descargar_plantilla_usuarios(request):
     wb = Workbook()
     ws = wb.active
     ws.title = 'Usuarios'
-    ws.append(['nombre', 'documento'])
-    ws.append(['Ejemplo Nombre', '1234567890'])
+    ws.append(['nombre', 'documento', 'rol'])
+    ws.append(['Ejemplo Enfermera', '1234567890', 'ENFERMERA'])
+    ws.append(['Ejemplo Regente', '987654321', 'REGENTE'])
     # Ajustar ancho de columnas
     ws.column_dimensions['A'].width = 35
     ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 15
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
@@ -670,7 +672,8 @@ def descargar_plantilla_usuarios(request):
 @require_POST
 def api_carga_masiva_usuarios(request):
     """Importa usuarios desde un archivo Excel o CSV.
-    Columnas esperadas: nombre, documento
+    Columnas esperadas: nombre, documento, [rol]
+    Roles válidos: ENFERMERA (default), REGENTE, ADMIN
     Clave temporal = documento completo, must_change_password=True
     """
     from django.contrib.auth.models import Group
@@ -688,7 +691,11 @@ def api_carga_masiva_usuarios(request):
     archivo = request.FILES['archivo']
     nombre_archivo = archivo.name.lower()
 
-    grupo_enfermera, _ = Group.objects.get_or_create(name='ENFERMERA')
+    # Asegurar que existen los grupos
+    ROLES_VALIDOS = {'ENFERMERA', 'REGENTE', 'ADMIN'}
+    for r in ROLES_VALIDOS:
+        Group.objects.get_or_create(name=r)
+
     sede = Ubicacion.objects.filter(nombre__icontains='Puerto Tejada').first()
     if not sede:
         sede = Ubicacion.objects.order_by('id').first()
@@ -705,23 +712,29 @@ def api_carga_masiva_usuarios(request):
                 nombre = (row.get('nombre') or '').strip()
                 documento = (row.get('documento') or '').strip()
                 documento = ''.join(c for c in documento if c.isdigit())
+                rol = (row.get('rol') or '').strip().upper()
+                if not rol or rol not in ROLES_VALIDOS:
+                    rol = 'ENFERMERA'
                 if nombre and documento:
-                    registros.append((nombre, documento))
+                    registros.append({'nombre': nombre, 'documento': documento, 'rol': rol})
 
         elif nombre_archivo.endswith('.xlsx'):
             import openpyxl
             import io
             wb = openpyxl.load_workbook(io.BytesIO(archivo.read()))
             ws = wb.active
-            rows = list(ws.iter_rows(min_row=2, values_only=True))  # saltar encabezado
+            rows = list(ws.iter_rows(min_row=2, values_only=True))
             for row in rows:
                 if not row or len(row) < 2:
                     continue
                 nombre = str(row[0]).strip() if row[0] else ''
                 documento = str(row[1]).strip() if row[1] else ''
                 documento = ''.join(c for c in documento if c.isdigit())
+                rol = str(row[2]).strip().upper() if len(row) > 2 and row[2] else 'ENFERMERA'
+                if rol not in ROLES_VALIDOS:
+                    rol = 'ENFERMERA'
                 if nombre and documento:
-                    registros.append((nombre, documento))
+                    registros.append({'nombre': nombre, 'documento': documento, 'rol': rol})
 
         else:
             return JsonResponse({'status': 'error', 'mensaje': 'Formato no soportado. Usa .csv o .xlsx'}, status=400)
@@ -733,7 +746,8 @@ def api_carga_masiva_usuarios(request):
         actualizados = 0
         errores = []
 
-        for nombre, documento in registros:
+        for item in registros:
+            nombre, documento, rol = item['nombre'], item['documento'], item['rol']
             try:
                 from django.contrib.auth.models import User
                 user, created = User.objects.get_or_create(
@@ -752,10 +766,12 @@ def api_carga_masiva_usuarios(request):
                         numero_identificacion=documento,
                         must_change_password=True,
                     )
-                    user.groups.add(grupo_enfermera)
+                    # Asignar grupos: el rol principal + siempre ENFERMERA
+                    user.groups.add(Group.objects.get(name=rol))
+                    if rol != 'ENFERMERA':
+                        user.groups.add(Group.objects.get(name='ENFERMERA'))
                     creados += 1
                 else:
-                    # Actualizar datos y resetear clave
                     user.first_name = nombre
                     user.set_password(documento)
                     user.save()
@@ -770,7 +786,11 @@ def api_carga_masiva_usuarios(request):
                     if not perfil.must_change_password:
                         perfil.must_change_password = True
                         perfil.save()
-                    user.groups.add(grupo_enfermera)
+                    # Re-asignar grupos: limpia y asigna
+                    user.groups.clear()
+                    user.groups.add(Group.objects.get(name=rol))
+                    if rol != 'ENFERMERA':
+                        user.groups.add(Group.objects.get(name='ENFERMERA'))
                     actualizados += 1
             except Exception as e:
                 errores.append(f'{documento}: {e}')
