@@ -221,15 +221,25 @@ def dashboard_kardex(request):
 # ==========================================
 @login_required
 def sincronizar_inventario_api(request):
-    """Envía el inventario al frontend, indicando si hay pedidos en curso"""
-    ubicacion = request.user.perfil.ubicacion_asignada
-    stock = InventarioStock.objects.filter(ubicacion=ubicacion).select_related('medicamento')
+    """Envía el inventario al frontend.
+    - ADMIN: ve stock de TODAS las sedes
+    - Otros roles: solo su sede asignada
+    """
+    grupos = request.user.groups.values_list('name', flat=True)
+    es_admin = 'ADMIN' in grupos
 
-    # 1. Buscamos qué medicamentos YA tienen un pedido "PENDIENTE" en esta sede
-    meds_pendientes = SolicitudStock.objects.filter(
-        sede_solicitante=ubicacion,
-        estado='PENDIENTE'
-    ).values_list('medicamento_id', flat=True)
+    if es_admin:
+        stock = InventarioStock.objects.all().select_related('medicamento', 'ubicacion')
+        meds_pendientes = SolicitudStock.objects.filter(
+            estado='PENDIENTE'
+        ).values_list('medicamento_id', flat=True)
+    else:
+        ubicacion = request.user.perfil.ubicacion_asignada
+        stock = InventarioStock.objects.filter(ubicacion=ubicacion).select_related('medicamento')
+        meds_pendientes = SolicitudStock.objects.filter(
+            sede_solicitante=ubicacion,
+            estado='PENDIENTE'
+        ).values_list('medicamento_id', flat=True)
 
     data = []
     for item in stock:
@@ -250,8 +260,9 @@ def sincronizar_inventario_api(request):
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
             'cups_codigo': item.medicamento.cups_codigo or '',
-            'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''} {item.medicamento.codigo or ''}".lower(),
-            # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
+            'ubicacion_id': item.ubicacion_id,
+            'ubicacion_nombre': item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else '',
+            'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''} {item.medicamento.codigo or ''} {item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else ''}".lower(),
             'en_tramite': item.medicamento.id in meds_pendientes
         })
     return JsonResponse({'inventario': data})
