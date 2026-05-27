@@ -1058,17 +1058,24 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
     if reader.fieldnames and 'cum' in reader.fieldnames and 'codigo' not in reader.fieldnames:
         reader.fieldnames = ['codigo' if f == 'cum' else f for f in reader.fieldnames]
 
-    # Determinar bodega principal y sede del admin
+    # Determinar bodega principal
     bodega_principal = Ubicacion.objects.filter(es_bodega_principal=True).first()
     if not bodega_principal:
         raise ValueError('No hay una bodega principal configurada (es_bodega_principal=True).')
 
-    sede_admin = usuario.perfil.ubicacion_asignada
-    requiere_traslado = sede_admin and sede_admin.id != bodega_principal.id
+    # Cache de sedes para resolver nombres
+    cache_sedes = {}
+    def _resolver_sede(nombre):
+        if not nombre:
+            return None
+        key = nombre.strip().lower()
+        if key not in cache_sedes:
+            cache_sedes[key] = Ubicacion.objects.filter(nombre__iexact=nombre.strip()).first()
+        return cache_sedes[key]
 
     contador = 0
     entradas = []  # (medicamento_id, lote, cantidad)
-    traslados_pendientes = []  # (medicamento_id, lote, cantidad)
+    traslados_pendientes = []  # (medicamento_id, lote, cantidad, sede_destino)
 
     with transaction.atomic():
         for row in reader:
@@ -1122,7 +1129,8 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 continue  # saltar filas sin lote
 
             fecha_vto = _normalizar_fecha(row.get('fecha_vencimiento', row.get('vencimiento', '')))
-            cantidad = int(row.get('cantidad', 0))
+            cantidad = int(row.get('cantidad', 0) or 0)
+            stock_min = int(row.get('stock_minimo') or 10)
 
             stock, _ = InventarioStock.objects.get_or_create(
                 ubicacion=bodega_principal,
@@ -1131,7 +1139,7 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 defaults={
                     'fecha_vencimiento': fecha_vto,
                     'cantidad_actual': 0,
-                    'stock_minimo': int(row.get('stock_minimo', 10))
+                    'stock_minimo': stock_min
                 }
             )
 
@@ -1140,8 +1148,11 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
             entradas.append((medicamento.id, lote, cantidad))
 
-            if requiere_traslado:
-                traslados_pendientes.append((medicamento.id, lote, cantidad))
+            # Leer sede de la fila (columna 'sede' en el CSV)
+            sede_nombre = row.get('sede', '').strip()
+            sede_destino = _resolver_sede(sede_nombre) if sede_nombre else None
+            if sede_destino and sede_destino.id != bodega_principal.id:
+                traslados_pendientes.append((medicamento.id, lote, cantidad, sede_destino))
 
             contador += 1
 
@@ -1160,40 +1171,55 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                     cantidad=cantidad,
                 )
 
-        # Ejecutar traslados pendientes (bodega → sede del admin)
-        if requiere_traslado and traslados_pendientes:
-            doc_traslado = Documento.objects.create(
-                tipo_mov='TRASLADO',
-                origen=bodega_principal,
-                destino=sede_admin,
-                usuario=usuario,
-            )
-            for med_id, lote, cantidad in traslados_pendientes:
-                stock_origen = InventarioStock.objects.select_for_update().get(
-                    ubicacion=bodega_principal, medicamento_id=med_id, lote=lote
-                )
-                if stock_origen.cantidad_actual < cantidad:
-                    continue
-                stock_destino, _ = InventarioStock.objects.get_or_create(
-                    ubicacion=sede_admin,
-                    medicamento_id=med_id,
-                    lote=lote,
-                    defaults={
-                        'cantidad_actual': 0,
-                        'fecha_vencimiento': stock_origen.fecha_vencimiento,
-                        'stock_minimo': stock_origen.stock_minimo,
+        # Ejecutar traslados pendientes (bodega → sede indicada en la fila)
+        if traslados_pendientes:
+            # Agrupar por sede destino para crear un documento TRASLADO por sede
+            traslados_por_sede = {}
+            for med_id, lote, cantidad, sede_dest in traslados_pendientes:
+                sede_key = sede_dest.id
+                if sede_key not in traslados_por_sede:
+                    traslados_por_sede[sede_key] = {
+                        'sede': sede_dest,
+                        'items': []
                     }
+                traslados_por_sede[sede_key]['items'].append((med_id, lote, cantidad))
+
+            for sede_key, grupo in traslados_por_sede.items():
+                sede_dest = grupo['sede']
+                items = grupo['items']
+
+                doc_traslado = Documento.objects.create(
+                    tipo_mov='TRASLADO',
+                    origen=bodega_principal,
+                    destino=sede_dest,
+                    usuario=usuario,
                 )
-                stock_origen.cantidad_actual -= cantidad
-                stock_origen.save()
-                stock_destino.cantidad_actual += cantidad
-                stock_destino.save()
-                DocumentoDetalle.objects.create(
-                    documento=doc_traslado,
-                    medicamento_id=med_id,
-                    lote=lote,
-                    cantidad=cantidad,
-                )
+                for med_id, lote, cantidad in items:
+                    stock_origen = InventarioStock.objects.select_for_update().get(
+                        ubicacion=bodega_principal, medicamento_id=med_id, lote=lote
+                    )
+                    if stock_origen.cantidad_actual < cantidad:
+                        continue
+                    stock_destino, _ = InventarioStock.objects.get_or_create(
+                        ubicacion=sede_dest,
+                        medicamento_id=med_id,
+                        lote=lote,
+                        defaults={
+                            'cantidad_actual': 0,
+                            'fecha_vencimiento': stock_origen.fecha_vencimiento,
+                            'stock_minimo': stock_origen.stock_minimo or 10,
+                        }
+                    )
+                    stock_origen.cantidad_actual -= cantidad
+                    stock_origen.save()
+                    stock_destino.cantidad_actual += cantidad
+                    stock_destino.save()
+                    DocumentoDetalle.objects.create(
+                        documento=doc_traslado,
+                        medicamento_id=med_id,
+                        lote=lote,
+                        cantidad=cantidad,
+                    )
 
     return contador
 
@@ -1234,6 +1260,7 @@ def generar_plantilla_xlsx():
         "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
         "presentacion", "laboratorio", "codigo", "cups_codigo",
         "registro_invima", "vida_util", "clasificacion_riesgo",
+        "sede",
         "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
     ]
 
@@ -1242,6 +1269,7 @@ def generar_plantilla_xlsx():
         "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
         "CAJA X 10", "GENFAR", "770123456", "70005",
         "2020M-0012345", "", "",
+        "Puerto Tejada",
         "LOTE001", "2026-12-31", "100", "20"
     ]
 
@@ -1250,6 +1278,7 @@ def generar_plantilla_xlsx():
         "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
         "CAJA X 100", "ECOPIEL", "", "70905",
         "INVIMA-2025E-001234", "3 AÑOS", "I",
+        "",
         "LOTE002", "2027-06-30", "500", "50"
     ]
 
@@ -1300,7 +1329,7 @@ def generar_plantilla_xlsx():
     # Anchos de columna
     anchos = {'A': 14, 'B': 30, 'C': 20, 'D': 14, 'E': 18, 'F': 16,
               'G': 14, 'H': 16, 'I': 22, 'J': 10, 'K': 20,
-              'L': 12, 'M': 18, 'N': 10, 'O': 12}
+              'L': 20, 'M': 12, 'N': 18, 'O': 10, 'P': 12}
     for letra, ancho in anchos.items():
         ws.column_dimensions[letra].width = ancho
 

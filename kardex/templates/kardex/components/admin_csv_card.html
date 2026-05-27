@@ -36,6 +36,7 @@
             <p class="text-[9px] text-amber-700 font-bold leading-tight">
                 <i class="fas fa-info-circle mr-1"></i> Columnas completas. Según el <b>tipo</b> (<span class="underline">MEDICAMENTO</span> o <span class="underline">DISPOSITIVO</span>) el sistema ignora campos no aplicables.
                 <br>Fechas: <span class="underline">AAAA-MM-DD</span>. Dispositivo: forma_farmaceutica = NO APLICA.
+                <br><b>sede</b>: si se especifica, se genera un TRASLADO desde la bodega principal a esa sede.
             </p>
         </div>
 
@@ -51,7 +52,7 @@
         const encabezados = [
             "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
             "presentacion", "laboratorio", "codigo", "cups_codigo", "registro_invima",
-            "vida_util", "clasificacion_riesgo",
+            "vida_util", "clasificacion_riesgo", "sede",
             "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
         ];
 
@@ -59,7 +60,7 @@
         const med = [
             "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
             "CAJA X 10", "GENFAR", "770123456", "770123456", "2020M-0012345",
-            "", "",
+            "", "", "Puerto Tejada",
             "LOTE001", "2026-12-31", "100", "20"
         ];
 
@@ -68,7 +69,7 @@
         const disp = [
             "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
             "CAJA X 100", "ECOPIEL", "", "", "INVIMA-2025E-001234",
-            "3 AÑOS", "I",
+            "3 AÑOS", "I", "",
             "LOTE002", "2027-06-30", "500", "50"
         ];
 
