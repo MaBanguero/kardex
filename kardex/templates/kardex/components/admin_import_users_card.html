@@ -1,0 +1,92 @@
+<div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in h-full flex flex-col">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fas fa-user-nurse"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Importar Usuarios</h3>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Enfermeras desde Excel / CSV</p>
+            </div>
+        </div>
+        <div class="flex gap-1.5">
+            <a href="{% url 'plantilla_usuarios' %}?formato=xlsx"
+               class="text-[10px] font-black uppercase bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-1.5 shadow-sm">
+                <i class="fas fa-file-excel"></i> XLSX
+            </a>
+            <a href="{% url 'plantilla_usuarios' %}?formato=csv"
+               class="text-[10px] font-black uppercase bg-slate-100 text-slate-500 px-3 py-2 rounded-lg hover:bg-purple-500 hover:text-white transition flex items-center gap-1.5">
+                <i class="fas fa-file-csv"></i> CSV
+            </a>
+        </div>
+    </div>
+
+    <form id="form-carga-usuarios" class="space-y-6 flex-1 flex flex-col">
+        {% csrf_token %}
+
+        <div class="border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl p-8 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all cursor-pointer group flex-1 flex flex-col justify-center" onclick="document.getElementById('archivo_usuarios').click()">
+            <input type="file" id="archivo_usuarios" accept=".csv,.xlsx" class="hidden">
+            <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                <i class="fas fa-cloud-upload-alt text-2xl text-slate-300 group-hover:text-purple-500"></i>
+            </div>
+            <p id="file-name-display-users" class="text-sm font-bold text-slate-500">Selecciona o arrastra el archivo</p>
+        </div>
+
+        <div class="bg-purple-50 border border-purple-100 p-3 rounded-xl">
+            <p class="text-[9px] text-purple-700 font-bold leading-tight">
+                <i class="fas fa-info-circle mr-1"></i> Columnas: <span class="underline">nombre</span>, <span class="underline">documento</span>.
+                La clave temporal será el <b>número de documento</b>.
+                En el primer inicio forzarán cambio de clave.
+                La sede se asigna según configuración del sistema.
+            </p>
+        </div>
+
+        <button type="submit" id="btn-upload-users" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-lg hover:bg-purple-600 shadow-lg transition-all active:scale-95 disabled:opacity-50">
+            Importar Usuarios
+        </button>
+    </form>
+</div>
+
+<script>
+    const fileInputUsers = document.getElementById('archivo_usuarios');
+    const displayUsers = document.getElementById('file-name-display-users');
+
+    fileInputUsers.addEventListener('change', (e) => {
+        if(e.target.files.length > 0) {
+            displayUsers.innerText = e.target.files[0].name;
+            displayUsers.classList.add('text-purple-600');
+        }
+    });
+
+    document.getElementById('form-carga-usuarios').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (fileInputUsers.files.length === 0) return alert("Selecciona un archivo.");
+
+        const btn = document.getElementById('btn-upload-users');
+        const formData = new FormData();
+        formData.append('archivo', fileInputUsers.files[0]);
+
+        btn.disabled = true;
+        btn.innerText = "Importando...";
+
+        fetch("{% url 'api_carga_masiva_usuarios' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                alert("✅ " + data.mensaje);
+                location.reload();
+            } else {
+                alert("❌ " + data.mensaje);
+            }
+        })
+        .catch(() => alert("❌ Error de conexión. Intenta de nuevo."))
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = "Importar Usuarios";
+        });
+    });
+</script>

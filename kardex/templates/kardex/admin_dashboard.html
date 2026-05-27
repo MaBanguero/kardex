@@ -204,6 +204,10 @@
             {% include "kardex/components/admin_csv_card.html" %}
         {% endif %}
 
+        {% if es_admin %}
+            {% include "kardex/components/admin_import_users_card.html" %}
+        {% endif %}
+
         {% if es_admin or es_regente %}
             {% include "kardex/components/admin_request_card.html" %}
         {% endif %}

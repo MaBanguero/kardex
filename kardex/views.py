@@ -629,6 +629,163 @@ def descargar_plantilla_carga(request):
 
 
 @login_required
+def descargar_plantilla_usuarios(request):
+    """Descarga plantilla para importar usuarios (XLSX o CSV)"""
+    from openpyxl import Workbook
+
+    formato = request.GET.get('formato', 'xlsx').lower()
+    filename = f'plantilla_importar_usuarios.{formato}'
+
+    if formato == 'csv':
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['nombre', 'documento'])
+        writer.writerow(['Ejemplo Nombre', '1234567890'])
+        writer.writerow(['', ''])  # fila vacía de referencia
+        content = output.getvalue()
+        response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
+
+    # XLSX por defecto
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Usuarios'
+    ws.append(['nombre', 'documento'])
+    ws.append(['Ejemplo Nombre', '1234567890'])
+    # Ajustar ancho de columnas
+    ws.column_dimensions['A'].width = 35
+    ws.column_dimensions['B'].width = 20
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+    wb.save(response)
+    return response
+
+
+@login_required
+@require_POST
+def api_carga_masiva_usuarios(request):
+    """Importa usuarios desde un archivo Excel o CSV.
+    Columnas esperadas: nombre, documento
+    Clave temporal = documento completo, must_change_password=True
+    """
+    from django.contrib.auth.models import Group
+    from django.contrib.auth.hashers import make_password
+    from kardex.models import Ubicacion
+
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'Solo administradores pueden importar usuarios'},
+                            status=403)
+
+    if 'archivo' not in request.FILES:
+        return JsonResponse({'status': 'error', 'mensaje': 'Debes seleccionar un archivo.'}, status=400)
+
+    archivo = request.FILES['archivo']
+    nombre_archivo = archivo.name.lower()
+
+    grupo_enfermera, _ = Group.objects.get_or_create(name='ENFERMERA')
+    sede = Ubicacion.objects.filter(nombre__icontains='Puerto Tejada').first()
+    if not sede:
+        sede = Ubicacion.objects.order_by('id').first()
+
+    try:
+        registros = []
+
+        if nombre_archivo.endswith('.csv'):
+            import csv
+            import io
+            decoded = archivo.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(decoded))
+            for row in reader:
+                nombre = (row.get('nombre') or '').strip()
+                documento = (row.get('documento') or '').strip()
+                documento = ''.join(c for c in documento if c.isdigit())
+                if nombre and documento:
+                    registros.append((nombre, documento))
+
+        elif nombre_archivo.endswith('.xlsx'):
+            import openpyxl
+            import io
+            wb = openpyxl.load_workbook(io.BytesIO(archivo.read()))
+            ws = wb.active
+            rows = list(ws.iter_rows(min_row=2, values_only=True))  # saltar encabezado
+            for row in rows:
+                if not row or len(row) < 2:
+                    continue
+                nombre = str(row[0]).strip() if row[0] else ''
+                documento = str(row[1]).strip() if row[1] else ''
+                documento = ''.join(c for c in documento if c.isdigit())
+                if nombre and documento:
+                    registros.append((nombre, documento))
+
+        else:
+            return JsonResponse({'status': 'error', 'mensaje': 'Formato no soportado. Usa .csv o .xlsx'}, status=400)
+
+        if not registros:
+            return JsonResponse({'status': 'error', 'mensaje': 'No se encontraron datos válidos en el archivo.'}, status=400)
+
+        creados = 0
+        actualizados = 0
+        errores = []
+
+        for nombre, documento in registros:
+            try:
+                from django.contrib.auth.models import User
+                user, created = User.objects.get_or_create(
+                    username=documento,
+                    defaults={
+                        'first_name': nombre,
+                        'last_name': '',
+                        'email': '',
+                        'password': make_password(documento),
+                    }
+                )
+                if created:
+                    PerfilUsuario.objects.create(
+                        usuario=user,
+                        ubicacion_asignada=sede,
+                        numero_identificacion=documento,
+                        must_change_password=True,
+                    )
+                    user.groups.add(grupo_enfermera)
+                    creados += 1
+                else:
+                    # Actualizar datos y resetear clave
+                    user.first_name = nombre
+                    user.set_password(documento)
+                    user.save()
+                    perfil, _ = PerfilUsuario.objects.get_or_create(
+                        usuario=user,
+                        defaults={
+                            'ubicacion_asignada': sede,
+                            'numero_identificacion': documento,
+                            'must_change_password': True,
+                        }
+                    )
+                    if not perfil.must_change_password:
+                        perfil.must_change_password = True
+                        perfil.save()
+                    user.groups.add(grupo_enfermera)
+                    actualizados += 1
+            except Exception as e:
+                errores.append(f'{documento}: {e}')
+
+        mensaje = f'✅ {creados} creados, {actualizados} actualizados.'
+        if errores:
+            mensaje += f'\n⚠️ {len(errores)} errores: {" | ".join(errores[:5])}'
+
+        return JsonResponse({'status': 'success', 'mensaje': mensaje})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': f'Error procesando archivo: {str(e)}'}, status=400)
+
+
+@login_required
 @require_POST
 def api_gestion_usuario(request):
     """Crea o edita un usuario y sus roles asignados (Solo ADMIN)"""
