@@ -641,9 +641,9 @@ def descargar_plantilla_usuarios(request):
         import io
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(['nombre', 'documento', 'rol'])
-        writer.writerow(['Ejemplo Enfermera', '1234567890', 'ENFERMERA'])
-        writer.writerow(['Ejemplo Regente', '987654321', 'REGENTE'])
+        writer.writerow(['nombre', 'documento', 'rol', 'sede'])
+        writer.writerow(['Ejemplo Enfermera', '1234567890', 'ENFERMERA', 'Puerto Tejada'])
+        writer.writerow(['Ejemplo Regente', '987654321', 'REGENTE', 'FarmaciaSede1'])
         content = output.getvalue()
         response = HttpResponse(content, content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename={filename}'
@@ -653,13 +653,14 @@ def descargar_plantilla_usuarios(request):
     wb = Workbook()
     ws = wb.active
     ws.title = 'Usuarios'
-    ws.append(['nombre', 'documento', 'rol'])
-    ws.append(['Ejemplo Enfermera', '1234567890', 'ENFERMERA'])
-    ws.append(['Ejemplo Regente', '987654321', 'REGENTE'])
+    ws.append(['nombre', 'documento', 'rol', 'sede'])
+    ws.append(['Ejemplo Enfermera', '1234567890', 'ENFERMERA', 'Puerto Tejada'])
+    ws.append(['Ejemplo Regente', '987654321', 'REGENTE', 'FarmaciaSede1'])
     # Ajustar ancho de columnas
     ws.column_dimensions['A'].width = 35
     ws.column_dimensions['B'].width = 20
     ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 20
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
@@ -696,9 +697,17 @@ def api_carga_masiva_usuarios(request):
     for r in ROLES_VALIDOS:
         Group.objects.get_or_create(name=r)
 
-    sede = Ubicacion.objects.filter(nombre__icontains='Puerto Tejada').first()
-    if not sede:
-        sede = Ubicacion.objects.order_by('id').first()
+    # Cache de sedes para evitar consultas repetidas
+    from django.core.cache import cache
+    _cache_sedes = {}
+
+    def _resolver_sede(nombre_sede):
+        if not nombre_sede:
+            return None
+        key = nombre_sede.strip().lower()
+        if key not in _cache_sedes:
+            _cache_sedes[key] = Ubicacion.objects.filter(nombre__iexact=nombre_sede.strip()).first()
+        return _cache_sedes[key]
 
     try:
         registros = []
@@ -715,8 +724,14 @@ def api_carga_masiva_usuarios(request):
                 rol = (row.get('rol') or '').strip().upper()
                 if not rol or rol not in ROLES_VALIDOS:
                     rol = 'ENFERMERA'
+                sede_nombre = (row.get('sede') or '').strip()
                 if nombre and documento:
-                    registros.append({'nombre': nombre, 'documento': documento, 'rol': rol})
+                    registros.append({
+                        'nombre': nombre,
+                        'documento': documento,
+                        'rol': rol,
+                        'sede': sede_nombre,
+                    })
 
         elif nombre_archivo.endswith('.xlsx'):
             import openpyxl
@@ -733,8 +748,14 @@ def api_carga_masiva_usuarios(request):
                 rol = str(row[2]).strip().upper() if len(row) > 2 and row[2] else 'ENFERMERA'
                 if rol not in ROLES_VALIDOS:
                     rol = 'ENFERMERA'
+                sede_nombre = str(row[3]).strip() if len(row) > 3 and row[3] else ''
                 if nombre and documento:
-                    registros.append({'nombre': nombre, 'documento': documento, 'rol': rol})
+                    registros.append({
+                        'nombre': nombre,
+                        'documento': documento,
+                        'rol': rol,
+                        'sede': sede_nombre,
+                    })
 
         else:
             return JsonResponse({'status': 'error', 'mensaje': 'Formato no soportado. Usa .csv o .xlsx'}, status=400)
@@ -748,6 +769,15 @@ def api_carga_masiva_usuarios(request):
 
         for item in registros:
             nombre, documento, rol = item['nombre'], item['documento'], item['rol']
+            sede_nombre = item.get('sede', '')
+
+            # Resolver sede: primero el nombre indicado, fallback a Puerto Tejada, fallback a la primera
+            sede_asignada = _resolver_sede(sede_nombre)
+            if not sede_asignada:
+                sede_asignada = Ubicacion.objects.filter(nombre__icontains='Puerto Tejada').first()
+            if not sede_asignada:
+                sede_asignada = Ubicacion.objects.order_by('id').first()
+
             try:
                 from django.contrib.auth.models import User
                 user, created = User.objects.get_or_create(
@@ -762,11 +792,10 @@ def api_carga_masiva_usuarios(request):
                 if created:
                     PerfilUsuario.objects.create(
                         usuario=user,
-                        ubicacion_asignada=sede,
+                        ubicacion_asignada=sede_asignada,
                         numero_identificacion=documento,
                         must_change_password=True,
                     )
-                    # Asignar grupos: el rol principal + siempre ENFERMERA
                     user.groups.add(Group.objects.get(name=rol))
                     if rol != 'ENFERMERA':
                         user.groups.add(Group.objects.get(name='ENFERMERA'))
@@ -778,7 +807,7 @@ def api_carga_masiva_usuarios(request):
                     perfil, _ = PerfilUsuario.objects.get_or_create(
                         usuario=user,
                         defaults={
-                            'ubicacion_asignada': sede,
+                            'ubicacion_asignada': sede_asignada,
                             'numero_identificacion': documento,
                             'must_change_password': True,
                         }
@@ -786,7 +815,6 @@ def api_carga_masiva_usuarios(request):
                     if not perfil.must_change_password:
                         perfil.must_change_password = True
                         perfil.save()
-                    # Re-asignar grupos: limpia y asigna
                     user.groups.clear()
                     user.groups.add(Group.objects.get(name=rol))
                     if rol != 'ENFERMERA':
