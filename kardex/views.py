@@ -250,7 +250,7 @@ def sincronizar_inventario_api(request):
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
             'cups_codigo': item.medicamento.cups_codigo or '',
-            'busqueda': f"{item.medicamento.principio_activo} {item.lote}".lower(),
+            'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''}".lower(),
             # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
             'en_tramite': item.medicamento.id in meds_pendientes
         })
@@ -271,7 +271,11 @@ def registrar_movimiento_view(request):
 
         if tipo == 'SALIDA':
             nombre_med = data.get('nombre_medicamento')
-            registrar_salida_paciente_inteligente(request.user, nombre_med, cantidad, id_paciente)
+            cups_codigo = data.get('cups_codigo')
+            registrar_salida_paciente_inteligente(
+                request.user, nombre_med, cantidad, id_paciente,
+                cups_codigo=cups_codigo
+            )
             return JsonResponse({'status': 'success', 'requiere_sincronizacion': True})
 
         elif tipo == 'DEVOLUCION':

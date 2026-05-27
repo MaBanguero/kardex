@@ -264,9 +264,10 @@ def registrar_salida_paciente(usuario, stock_id, cantidad, id_paciente):
         )
         return doc
 
-def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente):
+def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente, cups_codigo=None):
     """
     Descuenta stock automáticamente del lote más próximo a vencer (FEFO).
+    Si se proporciona cups_codigo, busca por CUPS; de lo contrario busca por nombre.
     """
     ubicacion_id = usuario.perfil.ubicacion_asignada.id
 
@@ -274,10 +275,17 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
         with transaction.atomic():
             # 1. Buscamos todos los lotes de este medicamento en esta sede
             # Ordenados por fecha_vencimiento (El más viejo primero)
+            filtro = {
+                'ubicacion_id': ubicacion_id,
+                'cantidad_actual__gt': 0,
+            }
+            if cups_codigo:
+                filtro['medicamento__cups_codigo'] = cups_codigo
+            else:
+                filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
+
             stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                ubicacion_id=ubicacion_id,
-                medicamento__principio_activo__iexact=nombre_medicamento.strip(),
-                cantidad_actual__gt=0
+                **filtro
             ).order_by('fecha_vencimiento')
 
             # 2. Verificamos si la suma de todos los lotes alcanza

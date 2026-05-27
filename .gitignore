@@ -12,3 +12,6 @@ db.sqlite3
 
 # Archivos estáticos recolectados
 staticfiles/*.xlsx
+
+# Archivos Excel con datos sensibles
+*.xlsx
