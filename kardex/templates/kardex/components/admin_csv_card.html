@@ -50,7 +50,7 @@
     function descargarPlantillaCSV() {
         const encabezados = [
             "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
-            "presentacion", "laboratorio", "codigo", "registro_invima",
+            "presentacion", "laboratorio", "codigo", "cups_codigo", "registro_invima",
             "vida_util", "clasificacion_riesgo",
             "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
         ];
@@ -58,7 +58,7 @@
         // MEDICAMENTO: todos los campos aplican
         const med = [
             "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
-            "CAJA X 10", "GENFAR", "770123456", "2020M-0012345",
+            "CAJA X 10", "GENFAR", "770123456", "770123456", "2020M-0012345",
             "", "",
             "LOTE001", "2026-12-31", "100", "20"
         ];
@@ -67,7 +67,7 @@
         // vida_util y clasificacion_riesgo aplican
         const disp = [
             "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
-            "CAJA X 100", "ECOPIEL", "", "INVIMA-2025E-001234",
+            "CAJA X 100", "ECOPIEL", "", "", "INVIMA-2025E-001234",
             "3 AÑOS", "I",
             "LOTE002", "2027-06-30", "500", "50"
         ];

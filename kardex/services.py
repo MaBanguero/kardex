@@ -1026,7 +1026,10 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
             cups_codigo = row.get('cups_codigo', '').strip()
             if not cups_codigo:
-                raise ValueError(f"El código CUPS es obligatorio. Fila: '{principio}'")
+                # Fallback: usar codigo (CUM) como CUPS
+                cups_codigo = row.get('codigo', '').strip()
+            if not cups_codigo:
+                cups_codigo = None
 
             if tipo == 'DISPOSITIVO':
                 forma = 'NO APLICA'
