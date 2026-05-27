@@ -1133,6 +1133,8 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 continue  # saltar filas sin lote
 
             fecha_vto = _normalizar_fecha(row.get('fecha_vencimiento', row.get('vencimiento', '')))
+            if not fecha_vto:
+                fecha_vto = None
             cantidad = int(row.get('cantidad', 0) or 0)
             stock_min = int(row.get('stock_minimo') or 10)
 
