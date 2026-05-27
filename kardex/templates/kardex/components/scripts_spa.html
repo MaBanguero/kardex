@@ -62,8 +62,9 @@
         // Si un item no tiene CUPS, cae en el agrupamiento por Nombre + Forma Farmacéutica
         const grouped = {};
         filtered.forEach(item => {
-            // Clave primaria: CUPS. Clave secundaria: nombre + forma farmacéutica
-            const cupsKey = item.cups_codigo ? `CUPS:${item.cups_codigo}` : null;
+            // Clave primaria: CUPS (usa cups_codigo o codigo CUM como fallback). Secundaria: nombre + forma farmacéutica
+            const cupsValue = item.cups_codigo || item.codigo;
+            const cupsKey = cupsValue ? `CUPS:${cupsValue}` : null;
             const nameKey = (item.principio_activo + '||' + item.forma_farmaceutica).toUpperCase().trim();
             const key = cupsKey || nameKey;
 
@@ -72,7 +73,7 @@
                     id_virtual: key.replace(/[^A-Z0-9]/g, ''), // ID seguro para el HTML
                     principio_activo: item.principio_activo,
                     forma_farmaceutica: item.forma_farmaceutica,
-                    cups_codigo: item.cups_codigo || '',
+                    cups_codigo: item.cups_codigo || item.codigo || '',
                     cantidad_actual: 0,
                     stock_minimo: item.stock_minimo,
                     lotes_set: new Set(),

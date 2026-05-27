@@ -250,7 +250,7 @@ def sincronizar_inventario_api(request):
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
             'cups_codigo': item.medicamento.cups_codigo or '',
-            'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''}".lower(),
+            'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''} {item.medicamento.codigo or ''}".lower(),
             # 2. Marcamos TRUE si el ID del medicamento está en la lista de pendientes
             'en_tramite': item.medicamento.id in meds_pendientes
         })

@@ -280,13 +280,27 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                 'cantidad_actual__gt': 0,
             }
             if cups_codigo:
-                filtro['medicamento__cups_codigo'] = cups_codigo
+                # Buscar por cups_codigo; si no hay match, probar por codigo (CUM)
+                stocks_disponibles = InventarioStock.objects.select_for_update().filter(
+                    ubicacion_id=ubicacion_id,
+                    medicamento__cups_codigo=cups_codigo,
+                    cantidad_actual__gt=0
+                ).order_by('fecha_vencimiento')
+
+                if not stocks_disponibles.exists():
+                    # Fallback: buscar por codigo (CUM) ya que el frontend
+                    # usa codigo como cups_codigo cuando no hay CUPS explícito
+                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
+                        ubicacion_id=ubicacion_id,
+                        medicamento__codigo=cups_codigo,
+                        cantidad_actual__gt=0
+                    ).order_by('fecha_vencimiento')
             else:
                 filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
 
-            stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                **filtro
-            ).order_by('fecha_vencimiento')
+                stocks_disponibles = InventarioStock.objects.select_for_update().filter(
+                    **filtro
+                ).order_by('fecha_vencimiento')
 
             # 2. Verificamos si la suma de todos los lotes alcanza
             total_disponible = sum(stock.cantidad_actual for stock in stocks_disponibles)
