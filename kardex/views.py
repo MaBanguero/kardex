@@ -44,18 +44,32 @@ class CustomLoginView(LoginView):
 
     def form_valid(self, form):
         """
-        Valida turno único de Enfermera:
-        - Si es ENFERMERA, solo puede haber UNA activa por turno de 12h
-        - ADMIN y REGENTE no tienen restricción
+        Login exitoso con lógica de turno único para ENFERMERA.
+        - Si must_change_password=True: salta la validación de turno (va directo a cambio de clave)
+        - Si es ENFERMERA sin must_change: valida turno único (1 activa por sede cada 12h)
+        - ADMIN y REGENTE: sin restricción de turno
         """
         user = form.get_user()
+
+        # Verificar que tenga perfil y sede
+        try:
+            perfil = user.perfil
+            if not perfil.ubicacion_asignada:
+                form.add_error(None, 'Tu usuario no tiene una sede asignada. Contacta al administrador.')
+                return self.form_invalid(form)
+        except PerfilUsuario.DoesNotExist:
+            form.add_error(None, 'Este usuario no tiene un perfil configurado. Contacta al administrador.')
+            return self.form_invalid(form)
+
+        # Si debe cambiar la clave → salta toda validación de turno
+        if perfil.must_change_password:
+            return super().form_valid(form)
+
+        # Validación de turno único solo para ENFERMERA (con clave ya cambiada)
         grupos = user.groups.values_list('name', flat=True)
 
         if 'ENFERMERA' in grupos:
             sede = user.perfil.ubicacion_asignada
-            if not sede:
-                form.add_error(None, 'Tu usuario no tiene una sede asignada. Contacta al administrador.')
-                return self.form_invalid(form)
 
             now = timezone.now()
             hora_limite = now - timedelta(hours=12)
@@ -94,21 +108,80 @@ class CustomLoginView(LoginView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        """Enruta al usuario según sus grupos (roles) después de un login exitoso"""
+        """
+        Enruta al usuario:
+        - Si debe cambiar la contraseña → pantalla de cambio de clave
+        - ADMIN/REGENTE → admin_dashboard
+        - ENFERMERA → dashboard de usuario
+        """
         usuario = self.request.user
 
-        # Leemos los grupos a los que pertenece el usuario
+        # Forzar cambio de contraseña ANTES de cualquier otra cosa
+        if usuario.perfil.must_change_password:
+            return reverse_lazy('cambiar_clave')
+
         grupos_usuario = usuario.groups.values_list('name', flat=True)
 
-        # Enrutamiento inteligente basado en múltiples roles
         if 'ADMIN' in grupos_usuario or 'REGENTE' in grupos_usuario:
             return reverse_lazy('admin_dashboard')
         elif 'ENFERMERA' in grupos_usuario:
             return reverse_lazy('dashboard')
 
-        # Ruta por defecto si un usuario fue creado pero aún no se le asigna ningún rol
         return reverse_lazy('dashboard')
 
+
+# ==========================================
+# CAMBIO OBLIGATORIO DE CONTRASEÑA
+# ==========================================
+from django.contrib import messages
+from django.shortcuts import redirect
+
+
+@login_required
+def cambiar_clave_view(request):
+    """
+    Vista para cambiar la contraseña.
+    Si must_change_password=True, fuerza el cambio antes de dejar acceder al sistema.
+    """
+    perfil = request.user.perfil
+
+    if request.method == 'POST':
+        current = request.POST.get('current_password', '')
+        new_pass = request.POST.get('new_password', '')
+        confirm = request.POST.get('confirm_password', '')
+
+        if not request.user.check_password(current):
+            messages.error(request, 'La contraseña actual no es correcta.')
+            return render(request, 'kardex/cambiar_clave.html', {'must_change': perfil.must_change_password})
+
+        if not new_pass or not confirm:
+            messages.error(request, 'Todos los campos son obligatorios.')
+            return render(request, 'kardex/cambiar_clave.html', {'must_change': perfil.must_change_password})
+
+        if new_pass != confirm:
+            messages.error(request, 'Las contraseñas nuevas no coinciden.')
+            return render(request, 'kardex/cambiar_clave.html', {'must_change': perfil.must_change_password})
+
+        if len(new_pass) < 6:
+            messages.error(request, 'La nueva contraseña debe tener al menos 6 caracteres.')
+            return render(request, 'kardex/cambiar_clave.html', {'must_change': perfil.must_change_password})
+
+        # Cambiar contraseña
+        request.user.set_password(new_pass)
+        request.user.save()
+
+        perfil.must_change_password = False
+        perfil.last_password_change = timezone.now()
+        perfil.save()
+
+        # Re-autenticar para que la sesión no se pierda
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+
+        messages.success(request, '✅ Contraseña cambiada exitosamente. Ya puedes usar el sistema.')
+        return redirect('dashboard')
+
+    return render(request, 'kardex/cambiar_clave.html', {'must_change': perfil.must_change_password})
 
 
 # ==========================================

@@ -11,4 +11,4 @@ __pycache__/
 db.sqlite3
 
 # Archivos estáticos recolectados
-staticfiles/
+staticfiles/*.xlsx

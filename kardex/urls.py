@@ -6,6 +6,7 @@ urlpatterns = [
 
     path('login/', views.CustomLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(next_page='login'), name='logout'),
+    path('cambiar-clave/', views.cambiar_clave_view, name='cambiar_clave'),
     # ==========================================
     # 1. INTERFAZ DE USUARIO (UI)
     # ==========================================

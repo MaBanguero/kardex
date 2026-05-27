@@ -38,6 +38,14 @@ class PerfilUsuario(models.Model):
         help_text="Ubicación física principal del usuario."
     )
     numero_identificacion = models.CharField(max_length=50, unique=True)
+    must_change_password = models.BooleanField(
+        default=True,
+        help_text="Indica si el usuario debe cambiar su contraseña en el próximo inicio de sesión."
+    )
+    last_password_change = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Fecha y hora del último cambio de contraseña."
+    )
 
     def __str__(self):
         return self.usuario.get_full_name()
