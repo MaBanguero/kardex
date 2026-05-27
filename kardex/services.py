@@ -1058,7 +1058,18 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
     if reader.fieldnames and 'cum' in reader.fieldnames and 'codigo' not in reader.fieldnames:
         reader.fieldnames = ['codigo' if f == 'cum' else f for f in reader.fieldnames]
 
+    # Determinar bodega principal y sede del admin
+    bodega_principal = Ubicacion.objects.filter(es_bodega_principal=True).first()
+    if not bodega_principal:
+        raise ValueError('No hay una bodega principal configurada (es_bodega_principal=True).')
+
+    sede_admin = usuario.perfil.ubicacion_asignada
+    requiere_traslado = sede_admin and sede_admin.id != bodega_principal.id
+
     contador = 0
+    entradas = []  # (medicamento_id, lote, cantidad)
+    traslados_pendientes = []  # (medicamento_id, lote, cantidad)
+
     with transaction.atomic():
         for row in reader:
             tipo = row.get('tipo', 'MEDICAMENTO').strip().upper()
@@ -1105,14 +1116,16 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
             medicamento.save()
 
-            # --- Stock ---
+            # --- Stock en BODEGA PRINCIPAL ---
             lote = row.get('lote', '').strip().upper()
             if not lote:
                 continue  # saltar filas sin lote
 
             fecha_vto = _normalizar_fecha(row.get('fecha_vencimiento', row.get('vencimiento', '')))
+            cantidad = int(row.get('cantidad', 0))
+
             stock, _ = InventarioStock.objects.get_or_create(
-                ubicacion=usuario.perfil.ubicacion_asignada,
+                ubicacion=bodega_principal,
                 medicamento=medicamento,
                 lote=lote,
                 defaults={
@@ -1122,9 +1135,65 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 }
             )
 
-            stock.cantidad_actual += int(row.get('cantidad', 0))
+            stock.cantidad_actual += cantidad
             stock.save()
+
+            entradas.append((medicamento.id, lote, cantidad))
+
+            if requiere_traslado:
+                traslados_pendientes.append((medicamento.id, lote, cantidad))
+
             contador += 1
+
+        # Registrar un solo documento ENTRADA con todos los detalles
+        if entradas:
+            doc_entrada = Documento.objects.create(
+                tipo_mov='ENTRADA',
+                destino=bodega_principal,
+                usuario=usuario,
+            )
+            for med_id, lote, cantidad in entradas:
+                DocumentoDetalle.objects.create(
+                    documento=doc_entrada,
+                    medicamento_id=med_id,
+                    lote=lote,
+                    cantidad=cantidad,
+                )
+
+        # Ejecutar traslados pendientes (bodega → sede del admin)
+        if requiere_traslado and traslados_pendientes:
+            doc_traslado = Documento.objects.create(
+                tipo_mov='TRASLADO',
+                origen=bodega_principal,
+                destino=sede_admin,
+                usuario=usuario,
+            )
+            for med_id, lote, cantidad in traslados_pendientes:
+                stock_origen = InventarioStock.objects.select_for_update().get(
+                    ubicacion=bodega_principal, medicamento_id=med_id, lote=lote
+                )
+                if stock_origen.cantidad_actual < cantidad:
+                    continue
+                stock_destino, _ = InventarioStock.objects.get_or_create(
+                    ubicacion=sede_admin,
+                    medicamento_id=med_id,
+                    lote=lote,
+                    defaults={
+                        'cantidad_actual': 0,
+                        'fecha_vencimiento': stock_origen.fecha_vencimiento,
+                        'stock_minimo': stock_origen.stock_minimo,
+                    }
+                )
+                stock_origen.cantidad_actual -= cantidad
+                stock_origen.save()
+                stock_destino.cantidad_actual += cantidad
+                stock_destino.save()
+                DocumentoDetalle.objects.create(
+                    documento=doc_traslado,
+                    medicamento_id=med_id,
+                    lote=lote,
+                    cantidad=cantidad,
+                )
 
     return contador
 
