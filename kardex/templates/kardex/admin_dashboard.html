@@ -331,6 +331,14 @@
         if(target === 'configuracion' && window.cargarMovimientos) setTimeout(cargarMovimientos, 100);
     }
 
+    // 0. Cargar estado global de alertas al iniciar
+    (function cargarEstadoAlertas() {
+        fetch("{% url 'api_estado_alertas' %}", {method: 'POST'})
+            .then(r => r.json())
+            .then(d => { window.alertasHabilitadas = d.alertas_habilitadas !== false; })
+            .catch(() => { window.alertasHabilitadas = true; });
+    })();
+
     // 2. Sincronización y Renderizado de Inventario
     function cargarTablaAdmin() {
         fetch("{% url 'sincronizar_inventario_api' %}")
@@ -367,12 +375,15 @@
         // Agrupar por sede si estamos viendo todas (opcional, visual)
         const verTodas = !window.adminSedeFiltro || window.adminSedeFiltro === 'TODAS';
 
+        // Verificar si las alertas están habilitadas (config global)
+        const alertasOn = window.alertasHabilitadas !== false;
+
         body.innerHTML = items.map(i => {
             const esCritico = i.cantidad_actual <= i.stock_minimo;
             const requierePedido = esCritico && !i.en_tramite;
 
-            // Generar Alerta Roja Gigante si corresponde
-            if(requierePedido) {
+            // Generar Alerta Roja Gigante solo si las alertas están activas
+            if(requierePedido && alertasOn) {
                 htmlAlertas += `
                     <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex flex-col md:flex-row md:justify-between md:items-center gap-4 animate-fade-in">
                         <div class="flex items-center gap-4">

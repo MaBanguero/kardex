@@ -7,7 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from .models import Documento, ConfiguracionSistema, DocumentoDetalle, Medicamento, User, Ubicacion, SolicitudStock, TurnoEnfermera
 from django.db import transaction
-from django.db.models import Sum, Q as models_Q
+from django.db.models import Sum, Q as models_Q, Value as V
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 
@@ -542,15 +543,26 @@ def api_gestion_producto(request):
             medicamento.cups_codigo = cups_codigo
             medicamento.save()
 
-            lote_ingresado = data.get('lote').strip().upper()
+            lote_raw = data.get('lote')
+            lote_ingresado = lote_raw.strip().upper() if lote_raw else ''
+            if not lote_ingresado:
+                raise ValueError('El número de lote es obligatorio.')
 
-            # Validar que la fecha de vencimiento no sea pasada
+            # Validar que la fecha de vencimiento no sea pasada (si se proporciona)
+            from datetime import date, datetime
             fecha_venc = data.get('fecha_vencimiento')
             if fecha_venc:
-                from datetime import date
-                fecha_venc_date = date.fromisoformat(fecha_venc) if isinstance(fecha_venc, str) else fecha_venc
+                if isinstance(fecha_venc, str):
+                    try:
+                        fecha_venc_date = date.fromisoformat(fecha_venc)
+                    except ValueError:
+                        fecha_venc_date = datetime.strptime(fecha_venc, '%d/%m/%Y').date()
+                else:
+                    fecha_venc_date = fecha_venc
                 if fecha_venc_date < date.today():
                     raise ValueError("La fecha de vencimiento no puede ser anterior a la fecha actual.")
+            else:
+                fecha_venc = None
 
             # Validación de Integridad de Lotes
             if producto_id:
@@ -568,7 +580,7 @@ def api_gestion_producto(request):
 
             stock.medicamento = medicamento
             stock.lote = lote_ingresado
-            stock.fecha_vencimiento = data.get('fecha_vencimiento')
+            stock.fecha_vencimiento = fecha_venc
             stock.cantidad_actual = int(data.get('cantidad'))
             stock.stock_minimo = int(data.get('stock_minimo', 10))
             stock.save()
@@ -976,7 +988,7 @@ def api_atender_solicitud(request):
                     cantidad_restante = solicitud.cantidad_pedida
                     stocks_origen = InventarioStock.objects.filter(
                         ubicacion=bodega_central, medicamento=solicitud.medicamento, cantidad_actual__gt=0
-                    ).select_for_update().order_by('fecha_vencimiento')
+                    ).select_for_update().order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
                     for s in stocks_origen:
                         if cantidad_restante <= 0: break
                         a_descontar = min(s.cantidad_actual, cantidad_restante)
@@ -987,7 +999,7 @@ def api_atender_solicitud(request):
                 # Sumar a sede destino
                 stock = InventarioStock.objects.filter(
                     medicamento=solicitud.medicamento, ubicacion=solicitud.sede_solicitante
-                ).order_by('-fecha_vencimiento').first()
+                ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')).desc()).first()
                 if stock:
                     stock.cantidad_actual += solicitud.cantidad_pedida
                     stock.save()
@@ -1095,25 +1107,41 @@ def api_gestion_configuracion(request):
                 'status': 'success',
                 'config': {
                     'id': config.id,
-                    'horas_limite_devolucion': config.horas_limite_devolucion
+                    'horas_limite_devolucion': config.horas_limite_devolucion,
+                    'alertas_habilitadas': config.alertas_habilitadas
                 }
             })
 
         # Guardar
         config = ConfiguracionSistema.objects.first()
         if not config:
-            config = ConfiguracionSistema(horas_limite_devolucion=2)
+            config = ConfiguracionSistema(horas_limite_devolucion=2, alertas_habilitadas=True)
 
         horas = int(data.get('horas_limite_devolucion', 2))
         if horas < 1:
             return JsonResponse({'status': 'error', 'mensaje': 'Las horas deben ser al menos 1.'}, status=400)
         config.horas_limite_devolucion = horas
+
+        # Toggle de alertas
+        if 'alertas_habilitadas' in data:
+            config.alertas_habilitadas = bool(data['alertas_habilitadas'])
+
         config.save()
 
         return JsonResponse({'status': 'success', 'mensaje': 'Configuración actualizada.'})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+@login_required
+@require_POST
+def api_estado_alertas(request):
+    """Endpoint rápido para saber si las alertas están habilitadas (público para admins)"""
+    config = ConfiguracionSistema.objects.first()
+    habilitadas = config.alertas_habilitadas if config else True
+    return JsonResponse({'alertas_habilitadas': habilitadas})
 
 
 # ==============================================================================

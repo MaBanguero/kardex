@@ -56,12 +56,17 @@ class ConfiguracionSistema(models.Model):
         default=2,
         help_text="Horas máximas para devolver un medicamento antes de considerarse aplicado."
     )
+    alertas_habilitadas = models.BooleanField(
+        default=True,
+        help_text="Si está desactivado, no se muestran alertas de stock crítico ni semáforos de vencimiento."
+    )
 
     class Meta:
         verbose_name_plural = "Configuración del Sistema"
 
     def __str__(self):
-        return f"Regla de Devolución: {self.horas_limite_devolucion} horas"
+        estado_alerta = "ON" if self.alertas_habilitadas else "OFF"
+        return f"Devolución: {self.horas_limite_devolucion}h | Alertas: {estado_alerta}"
 
 
 class Ubicacion(models.Model):

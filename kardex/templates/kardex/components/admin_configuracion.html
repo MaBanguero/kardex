@@ -22,6 +22,31 @@
                 <p class="text-[10px] text-slate-400 mt-1 font-medium">Define cuántas horas después de una salida el usuario puede devolver medicamentos.</p>
             </div>
 
+            <!-- Toggle Alertas -->
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-lg">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800">Alertas de Stock</h4>
+                            <p class="text-[10px] text-slate-400 font-medium">Muestra alertas cuando un producto está por debajo del mínimo</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="inline-flex items-center gap-3 cursor-pointer select-none" for="cfg-alertas">
+                            <span id="cfg-alertas-label" class="text-sm font-bold text-slate-500">ACTIVAS</span>
+                            <div class="relative">
+                                <input type="checkbox" id="cfg-alertas" class="hidden" checked>
+                                <div id="cfg-alertas-track" class="w-14 h-7 bg-emerald-500 rounded-full transition-all duration-300 shadow-inner"></div>
+                                <div id="cfg-alertas-knob" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform translate-x-7"></div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" id="btn-save-cfg" class="w-full bg-purple-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-purple-700 shadow-lg shadow-purple-600/20 transition-all active:scale-95">
                 Guardar Configuración
             </button>
@@ -56,6 +81,26 @@
 
 <script>
     // ========== CONFIGURACIÓN ==========
+    function actualizarToggleAlertas(habilitadas) {
+        const checkbox = document.getElementById('cfg-alertas');
+        const track = document.getElementById('cfg-alertas-track');
+        const knob = document.getElementById('cfg-alertas-knob');
+        const label = document.getElementById('cfg-alertas-label');
+        if (!checkbox || !track || !knob || !label) return;
+        checkbox.checked = habilitadas;
+        if (habilitadas) {
+            track.className = 'w-14 h-7 bg-emerald-500 rounded-full transition-all duration-300 shadow-inner';
+            knob.className = 'absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform translate-x-7';
+            label.textContent = 'ACTIVAS';
+            label.className = 'text-sm font-bold text-emerald-600';
+        } else {
+            track.className = 'w-14 h-7 bg-slate-300 rounded-full transition-all duration-300 shadow-inner';
+            knob.className = 'absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform translate-x-0';
+            label.textContent = 'INACTIVAS';
+            label.className = 'text-sm font-bold text-slate-400';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         // Cargar configuración actual
         fetch("{% url 'api_gestion_configuracion' %}", {
@@ -67,8 +112,18 @@
         .then(d => {
             if(d.status === 'success' && d.config) {
                 document.getElementById('cfg-horas').value = d.config.horas_limite_devolucion;
+                actualizarToggleAlertas(d.config.alertas_habilitadas);
+                window.alertasHabilitadas = d.config.alertas_habilitadas;
             }
         });
+
+        // Click en toggle manual
+        const cfgAlertas = document.getElementById('cfg-alertas');
+        if (cfgAlertas) {
+            cfgAlertas.addEventListener('change', function() {
+                actualizarToggleAlertas(this.checked);
+            });
+        }
     });
 
     document.getElementById('form-configuracion').addEventListener('submit', function(e) {
@@ -81,13 +136,19 @@
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({
                 accion: 'guardar',
-                horas_limite_devolucion: document.getElementById('cfg-horas').value
+                horas_limite_devolucion: document.getElementById('cfg-horas').value,
+                alertas_habilitadas: document.getElementById('cfg-alertas').checked
             })
         })
         .then(r => r.json())
         .then(d => {
-            if(d.status === 'success') btn.innerText = '✅ Guardado';
-            else alert('❌ ' + d.mensaje);
+            if(d.status === 'success') {
+                btn.innerText = '✅ Guardado';
+                const hab = document.getElementById('cfg-alertas').checked;
+                window.alertasHabilitadas = hab;
+                actualizarToggleAlertas(hab);
+                if(typeof renderAdminTable === 'function') renderAdminTable();
+            } else alert('❌ ' + d.mensaje);
         })
         .finally(() => setTimeout(() => { btn.disabled = false; btn.innerText = 'Guardar Configuración'; }, 1500));
     });

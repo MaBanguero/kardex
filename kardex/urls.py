@@ -51,6 +51,7 @@ urlpatterns = [
     # --- Nuevos CRUD (independencia del admin de Django) ---
     path('api/gestion-ubicacion/', views.api_gestion_ubicacion, name='api_gestion_ubicacion'),
     path('api/gestion-configuracion/', views.api_gestion_configuracion, name='api_gestion_configuracion'),
+    path('api/estado-alertas/', views.api_estado_alertas, name='api_estado_alertas'),
     path('api/listar-movimientos/', views.api_listar_movimientos, name='api_listar_movimientos'),
     path('api/cancelar-solicitud/', views.api_cancelar_solicitud, name='api_cancelar_solicitud'),
     path('api/eliminar-stock/', views.api_eliminar_stock, name='api_eliminar_stock'),

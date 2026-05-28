@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from django.db.models import Sum
+from django.db.models import Sum, Value as V
+from django.db.models.functions import Coalesce
 from .models import Documento, DocumentoDetalle, InventarioStock, Ubicacion, Medicamento, PerfilUsuario
 from django.contrib.auth.models import User, Group
 import io, csv, re
@@ -285,7 +286,7 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                     ubicacion_id=ubicacion_id,
                     medicamento__cups_codigo=cups_codigo,
                     cantidad_actual__gt=0
-                ).order_by('fecha_vencimiento')
+                ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
                 if not stocks_disponibles.exists():
                     # Fallback: buscar por codigo (CUM) ya que el frontend
@@ -294,13 +295,13 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                         ubicacion_id=ubicacion_id,
                         medicamento__codigo=cups_codigo,
                         cantidad_actual__gt=0
-                    ).order_by('fecha_vencimiento')
+                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
             else:
                 filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
 
                 stocks_disponibles = InventarioStock.objects.select_for_update().filter(
                     **filtro
-                ).order_by('fecha_vencimiento')
+                ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
             # 2. Verificamos si la suma de todos los lotes alcanza
             total_disponible = sum(stock.cantidad_actual for stock in stocks_disponibles)
@@ -549,7 +550,7 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
             getattr(m, 'concentracion', ''),
             getattr(m, 'presentacion', ''),
             stock.lote,
-            stock.fecha_vencimiento.strftime("%d/%m/%Y"),
+            stock.fecha_vencimiento.strftime("%d/%m/%Y") if stock.fecha_vencimiento else 'S/D',
             getattr(m, 'unidad_medida', ''),  # UNIDAD DE MEDIDA
             m.registro_invima or '',
             semaforo,  # SEMAFORIZACIÓN
@@ -1134,7 +1135,9 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
             fecha_vto = _normalizar_fecha(row.get('fecha_vencimiento', row.get('vencimiento', '')))
             if not fecha_vto:
-                fecha_vto = None
+                # Dispositivos y items sin fecha: asignar 5 años por defecto
+                from datetime import date, timedelta
+                fecha_vto = (date.today() + timedelta(days=365 * 5)).isoformat()
             cantidad = int(row.get('cantidad', 0) or 0)
             stock_min = int(row.get('stock_minimo') or 10)
 
@@ -1212,7 +1215,7 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                         lote=lote,
                         defaults={
                             'cantidad_actual': 0,
-                            'fecha_vencimiento': stock_origen.fecha_vencimiento,
+                            'fecha_vencimiento': stock_origen.fecha_vencimiento or (datetime.date.today() + datetime.timedelta(days=365*5)).isoformat(),
                             'stock_minimo': stock_origen.stock_minimo or 10,
                         }
                     )
@@ -1243,104 +1246,210 @@ def registrar_solicitud_reabastecimiento(usuario, nombre_med, cantidad):
 
 def generar_plantilla_xlsx():
     """
-    Genera un workbook XLSX con la plantilla de carga masiva.
+    Genera un workbook XLSX con la plantilla de carga masiva formalizada.
     Incluye dos filas de ejemplo: MEDICAMENTO y DISPOSITIVO.
+    Incluye validaciones de datos en Excel para prevenir errores.
+
+    Cambios clave:
+    - fecha_vencimiento ahora acepta NULL (el sistema asigna 5 años por defecto para dispositivos)
+    - Validaciones: dropdowns para tipo y clasificacion_riesgo, formato fecha
+    - Columnas obligatorias marcadas visualmente
     """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Plantilla Carga Masiva"
 
+    # ── Estilos ──────────────────────────────────────────────────────
     fuente_titulo = Font(bold=True, size=11, name='Arial', color='FFFFFF')
     fuente_normal = Font(size=10, name='Arial')
+    fuente_ejemplo = Font(size=10, name='Arial', color='1E40AF', italic=True)
     alineacion_centro = Alignment(horizontal="center", vertical="center", wrap_text=True)
     alineacion_izq = Alignment(horizontal="left", vertical="center", wrap_text=True)
     borde_fino = Border(
         left=Side(style='thin'), right=Side(style='thin'),
         top=Side(style='thin'), bottom=Side(style='thin')
     )
-    fondo_azul = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
-    fondo_ejemplo_med = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
-    fondo_ejemplo_disp = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+    fondo_oblig = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+    fondo_opcional = PatternFill(start_color="CBD5E1", end_color="CBD5E1", fill_type="solid")
+    fondo_ejemplo = PatternFill(start_color="FEF9C3", end_color="FEF9C3", fill_type="solid")
+    fondo_rojo_aviso = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
 
-    encabezados = [
-        "tipo", "principio_activo", "forma_farmaceutica", "concentracion",
-        "presentacion", "laboratorio", "codigo", "cups_codigo",
-        "registro_invima", "vida_util", "clasificacion_riesgo",
-        "sede",
-        "lote", "fecha_vencimiento", "cantidad", "stock_minimo"
+    # ── Encabezados con flag de obligatoriedad ───────────────────────
+    # (nombre, obligatorio)
+    columnas = [
+        ("tipo", True),
+        ("principio_activo", True),
+        ("forma_farmaceutica", True),
+        ("concentracion", False),
+        ("presentacion", True),
+        ("laboratorio", True),
+        ("codigo", True),
+        ("cups_codigo", True),
+        ("registro_invima", True),
+        ("vida_util", False),
+        ("clasificacion_riesgo", False),
+        ("sede", False),
+        ("lote", True),
+        ("fecha_vencimiento", False),  # Ahora opcional — se auto-completa
+        ("cantidad", True),
+        ("stock_minimo", True),
     ]
 
-    # Ejemplo medicamento
+    # Anchos de columna
+    anchos = {
+        'A': 14, 'B': 35, 'C': 22, 'D': 16, 'E': 20, 'F': 18,
+        'G': 16, 'H': 18, 'I': 24, 'J': 12, 'K': 22,
+        'L': 22, 'M': 14, 'N': 18, 'O': 10, 'P': 12
+    }
+
+    # ── Ejemplos ─────────────────────────────────────────────────────
     ejemplo_med = [
         "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
         "CAJA X 10", "GENFAR", "770123456", "70005",
         "2020M-0012345", "", "",
-        "Puerto Tejada",
-        "LOTE001", "2026-12-31", "100", "20"
+        "Puerto Tejada", "LOTE001", "2026-12-31", "100", "20"
     ]
 
-    # Ejemplo dispositivo
     ejemplo_disp = [
         "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
         "CAJA X 100", "ECOPIEL", "", "70905",
         "INVIMA-2025E-001234", "3 AÑOS", "I",
-        "",
-        "LOTE002", "2027-06-30", "500", "50"
+        "", "LOTE002", "", "500", "50"  # fecha_vencimiento vacío intencional
     ]
 
-    # Hoja informativa (fila 1)
-    ws.merge_cells('A1:O1')
-    ws['A1'] = "PLANTILLA DE CARGA MASIVA - KARDEX FARMACIA"
+    # ── Fila 1: Título ───────────────────────────────────────────────
+    ws.merge_cells('A1:P1')
+    ws['A1'].value = "PLANTILLA DE CARGA MASIVA - KARDEX FARMACIA"
     ws['A1'].font = Font(bold=True, size=14, name='Arial', color='1E3A8A')
     ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[1].height = 35
 
-    ws.merge_cells('A2:O2')
-    ws['A2'] = "Complete los datos. Todas las columnas con HEADER AZUL son obligatorias. Borre las filas de ejemplo antes de importar."
+    # ── Fila 2: Instrucciones ────────────────────────────────────────
+    ws.merge_cells('A2:P2')
+    ws['A2'].value = (
+        "Columnas con fondo AZUL = OBLIGATORIAS, fondo GRIS = opcionales. "
+        "Borre las filas de ejemplo antes de importar. "
+        "Si no tiene fecha de vencimiento (dispositivos), déjela vacía — el sistema asignará una fecha automática."
+    )
     ws['A2'].font = Font(size=9, name='Arial', italic=True, color='64748B')
     ws['A2'].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
-    ws.row_dimensions[2].height = 25
+    ws.row_dimensions[2].height = 30
 
-    # Fila de headers (fila 4)
-    row_header = 4
-    ws.row_dimensions[row_header].height = 28
-    for col_idx, titulo in enumerate(encabezados, start=1):
-        celda = ws.cell(row=row_header, column=col_idx, value=titulo)
+    # ── Fila 4: Headers ──────────────────────────────────────────────
+    ROW_HEADER = 4
+    ws.row_dimensions[ROW_HEADER].height = 30
+    for col_idx, (nombre, obligatorio) in enumerate(columnas, start=1):
+        celda = ws.cell(row=ROW_HEADER, column=col_idx, value=nombre)
         celda.font = fuente_titulo
         celda.alignment = alineacion_centro
-        celda.fill = fondo_azul
+        celda.fill = fondo_oblig if obligatorio else fondo_opcional
         celda.border = borde_fino
+        letra = get_column_letter(col_idx)
+        ws.column_dimensions[letra].width = anchos.get(letra, 12)
 
-    # Ejemplo MEDICAMENTO (fila 5)
-    row_med = 5
-    ws.row_dimensions[row_med].height = 22
-    cols_centradas = {1, 4, 12, 13, 14, 15}
+    # ── Fila 5: Ejemplo MEDICAMENTO ──────────────────────────────────
+    ROW_MED = 5
+    ws.row_dimensions[ROW_MED].height = 22
+    cols_centradas = {1, 4, 7, 12, 13, 14, 15, 16}
     for col_idx, valor in enumerate(ejemplo_med, start=1):
-        celda = ws.cell(row=row_med, column=col_idx, value=valor)
-        celda.font = fuente_normal
+        celda = ws.cell(row=ROW_MED, column=col_idx, value=valor)
+        celda.font = fuente_ejemplo
         celda.alignment = alineacion_centro if col_idx in cols_centradas else alineacion_izq
-        celda.fill = fondo_ejemplo_med
+        celda.fill = fondo_ejemplo
         celda.border = borde_fino
 
-    # Ejemplo DISPOSITIVO (fila 6)
-    row_disp = 6
-    ws.row_dimensions[row_disp].height = 22
+    # ── Fila 6: Ejemplo DISPOSITIVO ──────────────────────────────────
+    ROW_DISP = 6
+    ws.row_dimensions[ROW_DISP].height = 22
     for col_idx, valor in enumerate(ejemplo_disp, start=1):
-        celda = ws.cell(row=row_disp, column=col_idx, value=valor)
-        celda.font = fuente_normal
+        celda = ws.cell(row=ROW_DISP, column=col_idx, value=valor)
+        celda.font = fuente_ejemplo
         celda.alignment = alineacion_centro if col_idx in cols_centradas else alineacion_izq
-        celda.fill = fondo_ejemplo_disp
+        celda.fill = fondo_ejemplo
         celda.border = borde_fino
+    # Resaltar la celda vacía de fecha_vencimiento en el ejemplo dispositivo
+    ws.cell(row=ROW_DISP, column=14).fill = fondo_rojo_aviso
 
-    # Anchos de columna
-    anchos = {'A': 14, 'B': 30, 'C': 20, 'D': 14, 'E': 18, 'F': 16,
-              'G': 14, 'H': 16, 'I': 22, 'J': 10, 'K': 20,
-              'L': 20, 'M': 12, 'N': 18, 'O': 10, 'P': 12}
-    for letra, ancho in anchos.items():
-        ws.column_dimensions[letra].width = ancho
+    # ── Fila 7: Nota informativa ─────────────────────────────────────
+    ws.merge_cells('A7:P7')
+    ws['A7'].value = (
+        "➡️  En el ejemplo DISPOSITIVO la fecha de vencimiento se dejó vacía "
+        "porque los dispositivos suelen no tener fecha de expiración. "
+        "El sistema le asignará una automática."
+    )
+    ws['A7'].font = Font(size=8, name='Arial', italic=True, color='B91C1C')
+    ws['A7'].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    ws.row_dimensions[7].height = 22
 
-    # Congelar paneles
-    ws.freeze_panes = 'A5'
+    # ── Data Validations (desde fila 8) ───────────────────────────────
+    # Tipo: dropdown MEDICAMENTO|DISPOSITIVO
+    dv_tipo = DataValidation(
+        type='list',
+        formula1='"MEDICAMENTO,DISPOSITIVO"',
+        allow_blank=False,
+        showErrorMessage=True,
+        errorTitle='Tipo inválido',
+        error='Solo se acepta MEDICAMENTO o DISPOSITIVO.'
+    )
+    dv_tipo.sqref = 'A8:A10000'
+    ws.add_data_validation(dv_tipo)
+
+    # Clasificación de riesgo: dropdown I|II|III
+    dv_clasif = DataValidation(
+        type='list',
+        formula1='"I,II,III"',
+        allow_blank=True,
+        showErrorMessage=True,
+        errorTitle='Clasificación inválida',
+        error='Use I, II o III para clasificación de riesgo.'
+    )
+    dv_clasif.sqref = 'K8:K10000'
+    ws.add_data_validation(dv_clasif)
+
+    # Fecha de vencimiento: validación de fecha
+    dv_date = DataValidation(
+        type='date',
+        allow_blank=True,
+        showErrorMessage=True,
+        errorTitle='Fecha inválida',
+        error='Ingrese la fecha en formato YYYY-MM-DD (ej: 2026-12-31). Deje vacío si no aplica.'
+    )
+    dv_date.sqref = 'N8:N10000'
+    ws.add_data_validation(dv_date)
+
+    # Cantidad: entero >= 0
+    dv_qty = DataValidation(
+        type='whole',
+        operator='greaterThanOrEqual',
+        formula1='0',
+        allow_blank=False,
+        showErrorMessage=True,
+        errorTitle='Cantidad inválida',
+        error='La cantidad debe ser un número entero >= 0.'
+    )
+    dv_qty.sqref = 'O8:O10000'
+    ws.add_data_validation(dv_qty)
+
+    # Stock mínimo: entero >= 0
+    dv_stock = DataValidation(
+        type='whole',
+        operator='greaterThanOrEqual',
+        formula1='0',
+        allow_blank=False,
+        showErrorMessage=True,
+        errorTitle='Stock mínimo inválido',
+        error='El stock mínimo debe ser un número entero >= 0.'
+    )
+    dv_stock.sqref = 'P8:P10000'
+    ws.add_data_validation(dv_stock)
+
+    # ── Congelar paneles ──────────────────────────────────────────────
+    ws.freeze_panes = 'A8'
 
     return wb
 
