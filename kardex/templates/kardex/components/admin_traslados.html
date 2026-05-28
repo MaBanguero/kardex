@@ -1,0 +1,321 @@
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Formulario de Traslado -->
+    <div class="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fas fa-exchange-alt"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Trasladar Stock</h3>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Bodega Principal → Sede</p>
+            </div>
+        </div>
+
+        <form id="form-traslado" class="space-y-5">
+            {% csrf_token %}
+
+            <!-- Buscador de producto -->
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Producto a trasladar</label>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"></i>
+                    <input type="text" id="traslado-buscar" autocomplete="off"
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 text-sm font-medium text-slate-700 focus:ring-4 focus:ring-amber-500/10 outline-none"
+                           placeholder="Buscar por nombre, código o lote...">
+                </div>
+                <div id="traslado-resultados" class="hidden mt-2 bg-white border border-slate-200 rounded-xl max-h-48 overflow-y-auto shadow-lg divide-y divide-slate-100"></div>
+            </div>
+
+            <!-- Producto seleccionado -->
+            <div id="traslado-seleccion" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest">Seleccionado</p>
+                        <h4 id="ts-nombre" class="font-bold text-slate-800 text-lg mt-1"></h4>
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            <span id="ts-tipo" class="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 uppercase"></span>
+                            <span id="ts-lote" class="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700"></span>
+                            <span id="ts-stock" class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700"></span>
+                            <span id="ts-vence" class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600"></span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="limpiarSeleccionTraslado()" class="text-slate-400 hover:text-red-500 transition p-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <input type="hidden" id="ts-medicamento-id">
+            <input type="hidden" id="ts-lote-val">
+            <input type="hidden" id="ts-stock-disponible">
+
+            <!-- Sede destino -->
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Sede destino</label>
+                <select id="ts-sede" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-medium text-slate-700 focus:ring-4 focus:ring-amber-500/10 outline-none">
+                    <option value="">— Seleccione una sede —</option>
+                    {% for s in sedes %}
+                        {% if not s.es_bodega_principal %}
+                        <option value="{{ s.id }}">{{ s.nombre }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Cantidad -->
+            <div>
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Cantidad a trasladar</label>
+                <div class="relative">
+                    <input type="number" id="ts-cantidad" min="1" max="99999" required
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-2xl font-black text-center text-slate-800 focus:ring-4 focus:ring-amber-500/10 outline-none"
+                           placeholder="0">
+                </div>
+                <p id="ts-max-msg" class="text-[10px] text-slate-400 mt-1 font-medium text-center"></p>
+            </div>
+
+            <button type="submit" id="btn-trasladar" disabled
+                    class="w-full bg-amber-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-amber-600 shadow-lg shadow-amber-500/30 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+                <i class="fas fa-exchange-alt mr-2"></i> Trasladar a Sede
+            </button>
+        </form>
+    </div>
+
+    <!-- Historial de Traslados -->
+    <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-fade-in flex flex-col">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fas fa-history"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Últimos Traslados</h3>
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Historial</p>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto max-h-[500px] pr-2 space-y-2" id="contenedor-traslados">
+            <div class="text-center p-8 text-slate-400 italic">
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Cargando...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== BUSCADOR DE PRODUCTOS (stock en bodega principal) ==========
+    let inventarioCache = [];
+    let trasladoTimer = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cargar inventario al iniciar
+        fetch("{% url 'sincronizar_inventario_api' %}")
+            .then(r => r.json())
+            .then(d => {
+                inventarioCache = d.inventario || [];
+            });
+
+        // Buscador con debounce
+        const inputBuscar = document.getElementById('traslado-buscar');
+        inputBuscar.addEventListener('input', function() {
+            clearTimeout(trasladoTimer);
+            const q = this.value.trim().toLowerCase();
+            if (q.length < 2) {
+                document.getElementById('traslado-resultados').classList.add('hidden');
+                return;
+            }
+            trasladoTimer = setTimeout(() => buscarProductos(q), 200);
+        });
+
+        // Submit form
+        document.getElementById('form-traslado').addEventListener('submit', function(e) {
+            e.preventDefault();
+            ejecutarTraslado();
+        });
+    });
+
+    function buscarProductos(q) {
+        const container = document.getElementById('traslado-resultados');
+        // Mostrar solo productos de bodega principal con stock > 0 que coincidan
+        const results = inventarioCache.filter(i => {
+            return i.busqueda && i.busqueda.includes(q) && i.cantidad_actual > 0;
+        }).slice(0, 15);
+
+        container.innerHTML = '';
+        if (results.length === 0) {
+            container.innerHTML = '<div class="p-4 text-sm text-slate-400 text-center italic">Sin resultados</div>';
+            container.classList.remove('hidden');
+            return;
+        }
+
+        results.forEach(i => {
+            const div = document.createElement('div');
+            div.className = 'p-3 hover:bg-amber-50 cursor-pointer transition flex items-center gap-3';
+            div.innerHTML = `
+                <div class="w-8 h-8 ${i.tipo === 'DISPOSITIVO' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'} rounded-lg flex items-center justify-center text-xs font-bold">
+                    ${i.tipo === 'DISPOSITIVO' ? '🔧' : '💊'}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-bold text-sm text-slate-800 truncate">${i.principio_activo}</p>
+                    <p class="text-[10px] text-slate-400 font-medium">
+                        ${i.lote} · ${i.cantidad_actual} uds · ${i.presentacion || ''}
+                    </p>
+                </div>
+            `;
+            div.onclick = () => seleccionarProducto(i);
+            container.appendChild(div);
+        });
+        container.classList.remove('hidden');
+    }
+
+    function seleccionarProducto(item) {
+        document.getElementById('traslado-resultados').classList.add('hidden');
+        document.getElementById('traslado-buscar').value = item.principio_activo + ' (' + item.lote + ')';
+
+        document.getElementById('ts-medicamento-id').value = item.medicamento_id;
+        document.getElementById('ts-lote-val').value = item.lote;
+        document.getElementById('ts-stock-disponible').value = item.cantidad_actual;
+
+        document.getElementById('ts-nombre').textContent = item.principio_activo;
+        document.getElementById('ts-tipo').textContent = item.tipo;
+        document.getElementById('ts-lote').textContent = 'Lote: ' + item.lote;
+        document.getElementById('ts-stock').textContent = 'Stock: ' + item.cantidad_actual + ' uds';
+        document.getElementById('ts-vence').textContent = 'Vence: ' + (item.fecha_vencimiento || 'S/D');
+
+        document.getElementById('traslado-seleccion').classList.remove('hidden');
+        document.getElementById('ts-cantidad').max = item.cantidad_actual;
+        document.getElementById('ts-max-msg').textContent = 'Máximo disponible: ' + item.cantidad_actual + ' unidades';
+        document.getElementById('btn-trasladar').disabled = false;
+
+        document.getElementById('ts-cantidad').focus();
+    }
+
+    function limpiarSeleccionTraslado() {
+        document.getElementById('traslado-seleccion').classList.add('hidden');
+        document.getElementById('traslado-buscar').value = '';
+        document.getElementById('ts-medicamento-id').value = '';
+        document.getElementById('ts-lote-val').value = '';
+        document.getElementById('ts-stock-disponible').value = '';
+        document.getElementById('ts-cantidad').value = '';
+        document.getElementById('ts-max-msg').textContent = '';
+        document.getElementById('btn-trasladar').disabled = true;
+    }
+
+    function ejecutarTraslado() {
+        const medId = document.getElementById('ts-medicamento-id').value;
+        const lote = document.getElementById('ts-lote-val').value;
+        const cantidad = parseInt(document.getElementById('ts-cantidad').value);
+        const sedeId = document.getElementById('ts-sede').value;
+        const maxStock = parseInt(document.getElementById('ts-stock-disponible').value);
+
+        if (!medId || !lote || !sedeId) {
+            alert('⚠️ Complete todos los campos: producto, sede destino y cantidad.');
+            return;
+        }
+        if (!cantidad || cantidad < 1) {
+            alert('⚠️ Ingrese una cantidad válida.');
+            return;
+        }
+        if (cantidad > maxStock) {
+            alert('⚠️ No puede trasladar más del stock disponible (' + maxStock + ' uds).');
+            return;
+        }
+
+        const btn = document.getElementById('btn-trasladar');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Trasladando...';
+
+        fetch("{% url 'api_realizar_traslado' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                medicamento_id: parseInt(medId),
+                lote: lote,
+                cantidad: cantidad,
+                sede_destino_id: parseInt(sedeId)
+            })
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                btn.innerHTML = '✅ ' + d.mensaje;
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i> Trasladar a Sede';
+                    btn.disabled = false;
+                }, 2000);
+                limpiarSeleccionTraslado();
+                cargarHistorialTraslados();
+                if (typeof cargarTablaAdmin === 'function') setTimeout(cargarTablaAdmin, 500);
+            } else {
+                alert('❌ ' + d.mensaje);
+                btn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i> Trasladar a Sede';
+                btn.disabled = false;
+            }
+        })
+        .catch(err => {
+            alert('❌ Error de conexión: ' + err.message);
+            btn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i> Trasladar a Sede';
+            btn.disabled = false;
+        });
+    }
+
+    // ========== HISTORIAL DE TRASLADOS ==========
+    function cargarHistorialTraslados() {
+        const cont = document.getElementById('contenedor-traslados');
+        cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Cargando...</p></div>';
+
+        fetch("{% url 'api_listar_movimientos' %}")
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') {
+                cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic">Error al cargar</div>';
+                return;
+            }
+
+            const traslados = (d.movimientos || []).filter(m => m.tipo_mov === 'TRASLADO').slice(0, 20);
+
+            if (traslados.length === 0) {
+                cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic border-2 border-dashed border-slate-100 rounded-xl"><i class="fas fa-inbox text-3xl mb-2 opacity-50 block"></i>Sin traslados registrados.</div>';
+                return;
+            }
+
+            cont.innerHTML = traslados.map(m => {
+                const detHtml = (m.detalles || []).map(det =>
+                    `<span class="text-[10px] bg-white border border-slate-100 px-2 py-0.5 rounded font-bold">${det.cantidad}x ${det.medicamento} (${det.lote})</span>`
+                ).join(' ');
+
+                return `
+                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-100 hover:shadow-sm transition">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-800">TRASLADO</span>
+                            <span class="text-[9px] text-slate-400 font-bold">${m.fecha}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1 my-1">${detHtml}</div>
+                        <div class="text-[9px] text-slate-500 font-medium flex items-center gap-1">
+                            <i class="fas fa-arrow-right text-amber-500"></i>
+                            ${m.origen} → ${m.destino}
+                            <span class="ml-auto text-slate-400">${m.usuario}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(() => {
+            cont.innerHTML = '<div class="text-center p-8 text-red-400 italic">Error al cargar historial.</div>';
+        });
+    }
+
+    // Cargar historial al mostrar la pestaña
+    let trasladosObservador = null;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Detectar cuando la pestaña de traslados se activa
+        const observer = new MutationObserver(() => {
+            const vista = document.getElementById('admin-vista-traslados');
+            if (vista && !vista.classList.contains('hidden')) {
+                cargarHistorialTraslados();
+            }
+        });
+        document.querySelectorAll('[id^="admin-vista-"]').forEach(el => {
+            observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+        });
+    });
+</script>
