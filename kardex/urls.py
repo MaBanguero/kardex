@@ -55,6 +55,7 @@ urlpatterns = [
     path('api/listar-movimientos/', views.api_listar_movimientos, name='api_listar_movimientos'),
     path('api/cancelar-solicitud/', views.api_cancelar_solicitud, name='api_cancelar_solicitud'),
     path('api/eliminar-stock/', views.api_eliminar_stock, name='api_eliminar_stock'),
+    path('api/realizar-traslado/', views.api_realizar_traslado, name='api_realizar_traslado'),
     path('api/eliminar-usuario/', views.api_eliminar_usuario, name='api_eliminar_usuario'),
     path('api/plantilla-usuarios/', views.descargar_plantilla_usuarios, name='plantilla_usuarios'),
     path('api/carga-masiva-usuarios/', views.api_carga_masiva_usuarios, name='api_carga_masiva_usuarios'),

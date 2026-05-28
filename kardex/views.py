@@ -1224,6 +1224,98 @@ def api_cancelar_solicitud(request):
 # ==============================================================================
 @login_required
 @require_POST
+# ==============================================================================
+# TRASLADO MANUAL: Bodega Central → Sede
+# ==============================================================================
+@login_required
+@require_POST
+def api_realizar_traslado(request):
+    """
+    Traslada stock desde la bodega principal a una sede destino.
+    Recibe: {medicamento_id, lote, cantidad, sede_destino_id}
+    """
+    grupos_usuario = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos_usuario:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        med_id = data.get('medicamento_id')
+        lote = data.get('lote', '').strip().upper()
+        cantidad = int(data.get('cantidad', 0))
+        sede_destino_id = data.get('sede_destino_id')
+
+        if not med_id or not lote or cantidad <= 0 or not sede_destino_id:
+            return JsonResponse({'status': 'error', 'mensaje': 'Faltan datos: medicamento, lote, cantidad y sede destino son obligatorios.'}, status=400)
+
+        bodega_principal = Ubicacion.objects.filter(es_bodega_principal=True).first()
+        if not bodega_principal:
+            return JsonResponse({'status': 'error', 'mensaje': 'No hay una bodega principal configurada.'}, status=400)
+
+        sede_destino = Ubicacion.objects.get(id=sede_destino_id)
+        if sede_destino.id == bodega_principal.id:
+            return JsonResponse({'status': 'error', 'mensaje': 'No se puede trasladar a la misma bodega principal.'}, status=400)
+
+        medicamento = Medicamento.objects.get(id=med_id)
+
+        with transaction.atomic():
+            stock_origen = InventarioStock.objects.select_for_update().get(
+                ubicacion=bodega_principal,
+                medicamento=medicamento,
+                lote=lote
+            )
+
+            if stock_origen.cantidad_actual < cantidad:
+                return JsonResponse({
+                    'status': 'error',
+                    'mensaje': f'Stock insuficiente en bodega central. Disponible: {stock_origen.cantidad_actual}, Solicitado: {cantidad}.'
+                }, status=400)
+
+            stock_destino, _ = InventarioStock.objects.get_or_create(
+                ubicacion=sede_destino,
+                medicamento=medicamento,
+                lote=lote,
+                defaults={
+                    'cantidad_actual': 0,
+                    'fecha_vencimiento': stock_origen.fecha_vencimiento,
+                    'stock_minimo': stock_origen.stock_minimo or 10,
+                }
+            )
+
+            stock_origen.cantidad_actual -= cantidad
+            stock_origen.save()
+
+            stock_destino.cantidad_actual += cantidad
+            stock_destino.save()
+
+            doc = Documento.objects.create(
+                tipo_mov='TRASLADO',
+                origen=bodega_principal,
+                destino=sede_destino,
+                usuario=request.user,
+            )
+            DocumentoDetalle.objects.create(
+                documento=doc,
+                medicamento=medicamento,
+                lote=lote,
+                cantidad=cantidad,
+            )
+
+        return JsonResponse({
+            'status': 'success',
+            'mensaje': f'✅ {cantidad} unidades de {medicamento.principio_activo} trasladadas a {sede_destino.nombre}.'
+        })
+
+    except Ubicacion.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Sede destino no encontrada.'}, status=404)
+    except Medicamento.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Medicamento no encontrado.'}, status=404)
+    except InventarioStock.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': f'No hay stock del lote "{lote}" en la bodega principal.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
 def api_eliminar_stock(request):
     """Elimina un registro de stock, y opcionalmente el medicamento si queda huérfano"""
     grupos_usuario = request.user.groups.values_list('name', flat=True)
