@@ -1169,20 +1169,21 @@ def api_estado_alertas(request):
 # ==============================================================================
 @login_required
 def api_listar_movimientos(request):
-    """Lista todos los movimientos del sistema (admin) o de la sede (regente)"""
+    """Lista todos los movimientos del sistema (admin) o de la sede (regente/enfermera)"""
     grupos_usuario = request.user.groups.values_list('name', flat=True)
     es_admin = 'ADMIN' in grupos_usuario
     es_regente = 'REGENTE' in grupos_usuario
+    es_enfermera = 'ENFERMERA' in grupos_usuario
 
-    if not (es_admin or es_regente):
+    if not (es_admin or es_regente or es_enfermera):
         return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
 
     try:
         movimientos = Documento.objects.select_related('usuario', 'origen', 'destino')\
             .prefetch_related('detalles__medicamento').order_by('-fecha')
 
-        if es_regente:
-            # Filtrar por sede del regente
+        if es_regente or es_enfermera:
+            # Filtrar por sede del usuario
             ubi = request.user.perfil.ubicacion_asignada
             movimientos = movimientos.filter(
                 models_Q(origen=ubi) | models_Q(destino=ubi)
