@@ -265,7 +265,7 @@ def registrar_salida_paciente(usuario, stock_id, cantidad, id_paciente):
         )
         return doc
 
-def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente, cups_codigo=None, codigo=None):
+def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente, cups_codigo=None, codigo=None, concentracion=None):
     """
     Descuenta stock automáticamente del lote más próximo a vencer (FEFO).
     Si se proporciona cups_codigo, busca por CUPS; de lo contrario busca por nombre.
@@ -297,11 +297,16 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
                 if not stocks_disponibles.exists():
-                    # Ultimo fallback: buscar por nombre exacto
+                    # Ultimo fallback: buscar por nombre + concentracion
+                    fallback_filtro = {
+                        'ubicacion_id': ubicacion_id,
+                        'medicamento__principio_activo__iexact': nombre_medicamento.strip(),
+                        'cantidad_actual__gt': 0,
+                    }
+                    if concentracion:
+                        fallback_filtro['medicamento__concentracion'] = concentracion.strip()
                     stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                        ubicacion_id=ubicacion_id,
-                        medicamento__principio_activo__iexact=nombre_medicamento.strip(),
-                        cantidad_actual__gt=0
+                        **fallback_filtro
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
             else:
                 if codigo:
@@ -312,7 +317,11 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
                 if not stocks_disponibles or not stocks_disponibles.exists():
-                    filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
+                    if concentracion:
+                        filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
+                        filtro['medicamento__concentracion'] = concentracion.strip()
+                    else:
+                        filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
                     stocks_disponibles = InventarioStock.objects.select_for_update().filter(
                         **filtro
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
