@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from django.db.models import Sum, Value as V
+from django.db.models import Sum, Value as V, Q
 from django.db.models.functions import Coalesce
 from .models import Documento, DocumentoDetalle, InventarioStock, Ubicacion, Medicamento, PerfilUsuario
 from django.contrib.auth.models import User, Group
@@ -276,55 +276,43 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
         with transaction.atomic():
             # 1. Buscamos todos los lotes de este medicamento en esta sede
             # Ordenados por fecha_vencimiento (El más viejo primero)
-            filtro = {
+            base_filtro = {
                 'ubicacion_id': ubicacion_id,
                 'cantidad_actual__gt': 0,
             }
-            if cups_codigo:
-                # Buscar por CUPS (codigo unico del procedimiento RIPS)
-                stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                    ubicacion_id=ubicacion_id,
-                    medicamento__cups_codigo=cups_codigo,
-                    cantidad_actual__gt=0
+
+            def _buscar_stock(**kwargs):
+                """Helper para construir el filtro con Q objects si hay detalle"""
+                q_extra = None
+                if concentracion:
+                    q_extra = Q(medicamento__presentacion=concentracion) | Q(medicamento__concentracion=concentracion)
+                filtro_completo = {**base_filtro, **kwargs}
+                if q_extra:
+                    return InventarioStock.objects.select_for_update().filter(
+                        q_extra, **filtro_completo
+                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+                return InventarioStock.objects.select_for_update().filter(
+                    **filtro_completo
                 ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
+            if cups_codigo:
+                stocks_disponibles = _buscar_stock(medicamento__cups_codigo=cups_codigo)
+
                 if not stocks_disponibles.exists() and codigo:
-                    # Fallback: buscar por codigo (CUM) cuando hay CUPS pero no coincide
-                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                        ubicacion_id=ubicacion_id,
-                        medicamento__codigo=codigo,
-                        cantidad_actual__gt=0
-                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+                    stocks_disponibles = _buscar_stock(medicamento__codigo=codigo)
 
                 if not stocks_disponibles.exists():
-                    # Ultimo fallback: buscar por nombre + concentracion
-                    fallback_filtro = {
-                        'ubicacion_id': ubicacion_id,
-                        'medicamento__principio_activo__iexact': nombre_medicamento.strip(),
-                        'cantidad_actual__gt': 0,
-                    }
-                    if concentracion:
-                        fallback_filtro['medicamento__concentracion'] = concentracion.strip()
-                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                        **fallback_filtro
-                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+                    stocks_disponibles = _buscar_stock(
+                        medicamento__principio_activo__iexact=nombre_medicamento.strip()
+                    )
             else:
                 if codigo:
-                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                        ubicacion_id=ubicacion_id,
-                        medicamento__codigo=codigo,
-                        cantidad_actual__gt=0
-                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+                    stocks_disponibles = _buscar_stock(medicamento__codigo=codigo)
 
                 if not stocks_disponibles or not stocks_disponibles.exists():
-                    if concentracion:
-                        filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
-                        filtro['medicamento__concentracion'] = concentracion.strip()
-                    else:
-                        filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
-                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
-                        **filtro
-                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+                    stocks_disponibles = _buscar_stock(
+                        medicamento__principio_activo__iexact=nombre_medicamento.strip()
+                    )
 
             # 2. Verificamos si la suma de todos los lotes alcanza
             total_disponible = sum(stock.cantidad_actual for stock in stocks_disponibles)

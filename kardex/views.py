@@ -290,7 +290,7 @@ def registrar_movimiento_view(request):
             nombre_med = data.get('nombre_medicamento')
             cups_codigo = data.get('cups_codigo')
             codigo = data.get('codigo')
-            concentracion = data.get('concentracion')
+            concentracion = data.get('detalle')
             registrar_salida_paciente_inteligente(
                 request.user, nombre_med, cantidad, id_paciente,
                 cups_codigo=cups_codigo, codigo=codigo, concentracion=concentracion
