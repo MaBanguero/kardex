@@ -1205,7 +1205,10 @@ def api_listar_movimientos(request):
                 'origen': str(mov.origen) if mov.origen else '-',
                 'destino': str(mov.destino) if mov.destino else '-',
                 'id_paciente': mov.id_paciente or '-',
-                'detalles': detalles
+                'detalles': detalles,
+                'aceptado': mov.aceptado,
+                'firma_nombre': mov.firma_nombre or '',
+                'fecha_aceptacion': mov.fecha_aceptacion.strftime('%Y-%m-%d %H:%M') if mov.fecha_aceptacion else '',
             })
 
         return JsonResponse({'status': 'success', 'movimientos': data})
@@ -1323,7 +1326,8 @@ def api_realizar_traslado(request):
 
         return JsonResponse({
             'status': 'success',
-            'mensaje': f'✅ {cantidad} unidades de {medicamento.principio_activo} trasladadas a {sede_destino.nombre}.'
+            'mensaje': f'✅ {cantidad} unidades de {medicamento.principio_activo} trasladadas a {sede_destino.nombre}.',
+            'doc_id': doc.id if doc else None,
         })
 
     except Ubicacion.DoesNotExist:
@@ -1332,6 +1336,75 @@ def api_realizar_traslado(request):
         return JsonResponse({'status': 'error', 'mensaje': 'Medicamento no encontrado.'}, status=404)
     except InventarioStock.DoesNotExist:
         return JsonResponse({'status': 'error', 'mensaje': f'No hay stock del lote "{lote}" en la bodega principal.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
+# REMISIÓN DE TRASLADO (HTML imprimible / PDF)
+# ==============================================================================
+@login_required
+def ver_remision_traslado(request, doc_id):
+    """Muestra la remisión de un traslado en formato HTML imprimible"""
+    try:
+        doc = Documento.objects.select_related('usuario', 'origen', 'destino').get(
+            id=doc_id,
+            tipo_mov='TRASLADO'
+        )
+        detalles = DocumentoDetalle.objects.filter(documento=doc).select_related('medicamento')
+
+        grupos = request.user.groups.values_list('name', flat=True)
+        if not ('ADMIN' in grupos):
+            sede_user = request.user.perfil.ubicacion_asignada
+            if doc.origen_id != sede_user.id and doc.destino_id != sede_user.id:
+                return render(request, 'kardex/error.html',
+                              {'mensaje': 'No tienes acceso a este documento.'})
+
+        return render(request, 'kardex/remision_traslado.html', {
+            'doc': doc,
+            'detalles': detalles,
+        })
+    except Documento.DoesNotExist:
+        return render(request, 'kardex/error.html',
+                      {'mensaje': 'Documento de traslado no encontrado.'})
+
+
+@login_required
+@require_POST
+def api_aceptar_traslado(request):
+    """La enfermera de la sede destino acepta el traslado y firma"""
+    try:
+        data = json.loads(request.body)
+        doc_id = data.get('doc_id')
+        firma_nombre = data.get('firma_nombre', '').strip()
+        firma_cedula = data.get('firma_cedula', '').strip()
+
+        if not firma_nombre or not firma_cedula:
+            return JsonResponse({'status': 'error', 'mensaje': 'Debe ingresar su nombre completo y número de cédula.'}, status=400)
+
+        doc = Documento.objects.get(id=doc_id, tipo_mov='TRASLADO')
+
+        if doc.aceptado:
+            return JsonResponse({'status': 'error', 'mensaje': 'Este traslado ya fue aceptado anteriormente.'}, status=400)
+
+        sede_user = request.user.perfil.ubicacion_asignada
+        if doc.destino_id != sede_user.id:
+            return JsonResponse({'status': 'error', 'mensaje': 'Solo el personal de la sede destino puede aceptar el traslado.'}, status=403)
+
+        doc.aceptado = True
+        doc.firma_nombre = firma_nombre
+        doc.firma_cedula = firma_cedula
+        doc.fecha_aceptacion = timezone.now()
+        doc.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'mensaje': '✅ Traslado aceptado y firmado correctamente.',
+            'doc_id': doc.id,
+        })
+
+    except Documento.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Documento de traslado no encontrado.'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
 

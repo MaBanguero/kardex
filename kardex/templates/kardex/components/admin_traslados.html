@@ -238,10 +238,18 @@
         .then(d => {
             if (d.status === 'success') {
                 btn.innerHTML = '✅ ' + d.mensaje;
+                // Mostrar link a remisión
+                const remisionLink = document.createElement('a');
+                remisionLink.href = '/kardex/remision-traslado/' + d.doc_id + '/';
+                remisionLink.target = '_blank';
+                remisionLink.className = 'block text-center text-[10px] font-bold text-blue-600 underline mt-2';
+                remisionLink.innerHTML = '<i class="fas fa-file-pdf mr-1"></i> Ver Remisión de Traslado';
+                btn.parentNode.appendChild(remisionLink);
                 setTimeout(() => {
                     btn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i> Trasladar a Sede';
                     btn.disabled = false;
-                }, 2000);
+                    if (remisionLink.parentNode) remisionLink.remove();
+                }, 5000);
                 limpiarSeleccionTraslado();
                 cargarHistorialTraslados();
                 if (typeof cargarTablaAdmin === 'function') setTimeout(cargarTablaAdmin, 500);
@@ -283,6 +291,10 @@
                     `<span class="text-[10px] bg-white border border-slate-100 px-2 py-0.5 rounded font-bold">${det.cantidad}x ${det.medicamento} (${det.lote})</span>`
                 ).join(' ');
 
+                const estadoBadge = m.aceptado
+                    ? `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fas fa-check-circle"></i> Aceptado</span>`
+                    : `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><i class="fas fa-clock"></i> Pendiente</span>`;
+
                 return `
                     <div class="p-3 bg-amber-50 rounded-xl border border-amber-100 hover:shadow-sm transition">
                         <div class="flex justify-between items-start mb-1">
@@ -294,6 +306,14 @@
                             <i class="fas fa-arrow-right text-amber-500"></i>
                             ${m.origen} → ${m.destino}
                             <span class="ml-auto text-slate-400">${m.usuario}</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-2 pt-2 border-t border-amber-200/50">
+                            <div>${estadoBadge}</div>
+                            <div class="flex gap-1">
+                                <a href="/kardex/remision-traslado/${m.id}/" target="_blank" class="text-[10px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition">
+                                    <i class="fas fa-file-pdf"></i> Remisión
+                                </a>
+                            </div>
                         </div>
                     </div>
                 `;
