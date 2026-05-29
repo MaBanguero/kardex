@@ -5,8 +5,8 @@
                 <i class="fas fa-truck-loading"></i>
             </div>
             <div>
-                <h3 class="font-bold text-slate-800">Traslados Pendientes de Aceptación</h3>
-                <p class="text-[10px] text-slate-500 font-medium">Los siguientes envíos requieren tu firma para ser recibidos</p>
+                <h3 class="font-bold text-slate-800">Traslados Pendientes de Recepción</h3>
+                <p class="text-[10px] text-slate-500 font-medium">Verifica las cantidades físicas y confirma o rechaza el traslado</p>
             </div>
         </div>
         <div id="lista-traslados-pendientes" class="space-y-3">
@@ -28,7 +28,8 @@ function cargarTrasladosPendientes() {
         .then(d => {
             if (d.status !== 'success') return;
             const pendientes = (d.movimientos || []).filter(m =>
-                m.tipo_mov === 'TRASLADO' && !m.aceptado && m.destino === '{{ ubicacion.nombre }}'
+                m.tipo_mov === 'TRASLADO' && !m.aceptado && !m.rechazado &&
+                m.destino === '{{ ubicacion.nombre }}'
             );
             const seccion = document.getElementById('seccion-traslados-pendientes');
             const lista = document.getElementById('lista-traslados-pendientes');
@@ -60,7 +61,11 @@ function cargarTrasladosPendientes() {
                             </a>
                             <button onclick="abrirModalAceptarTraslado(${m.id})"
                                     class="text-center bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-emerald-600 transition shadow-sm">
-                                <i class="fas fa-pen-signature mr-1"></i> Aceptar y Firmar
+                                <i class="fas fa-check-circle mr-1"></i> Aceptar
+                            </button>
+                            <button onclick="rechazarTraslado(${m.id})"
+                                    class="text-center bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-red-600 transition shadow-sm">
+                                <i class="fas fa-times-circle mr-1"></i> Rechazar
                             </button>
                         </div>
                     </div>
@@ -71,9 +76,9 @@ function cargarTrasladosPendientes() {
 }
 
 function abrirModalAceptarTraslado(docId) {
-    const nombre = prompt('Ingrese su nombre completo:');
+    const nombre = prompt('Ingrese su nombre completo (debe coincidir con su perfil):');
     if (!nombre || !nombre.trim()) return;
-    const cedula = prompt('Ingrese su número de cédula:');
+    const cedula = prompt('Ingrese su número de cédula (debe coincidir con la registrada en el sistema):');
     if (!cedula || !cedula.trim()) return;
 
     fetch("{% url 'api_aceptar_traslado' %}", {
@@ -86,6 +91,39 @@ function abrirModalAceptarTraslado(docId) {
             doc_id: docId,
             firma_nombre: nombre.trim(),
             firma_cedula: cedula.trim()
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'success') {
+            alert('✅ ' + d.mensaje);
+            cargarTrasladosPendientes();
+        } else {
+            alert('❌ ' + d.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err.message));
+}
+
+function rechazarTraslado(docId) {
+    const nombre = prompt('Ingrese su nombre completo:');
+    if (!nombre || !nombre.trim()) return;
+    const cedula = prompt('Ingrese su número de cédula (debe coincidir con la registrada):');
+    if (!cedula || !cedula.trim()) return;
+    const motivo = prompt('Describa el motivo del rechazo (ej: las cantidades físicas no coinciden con la remisión):');
+    if (!motivo || !motivo.trim()) return;
+
+    fetch("{% url 'api_rechazar_traslado' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            doc_id: docId,
+            firma_nombre: nombre.trim(),
+            firma_cedula: cedula.trim(),
+            motivo: motivo.trim()
         })
     })
     .then(r => r.json())

@@ -293,7 +293,9 @@
 
                 const estadoBadge = m.aceptado
                     ? `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><i class="fas fa-check-circle"></i> Aceptado</span>`
-                    : `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><i class="fas fa-clock"></i> Pendiente</span>`;
+                    : m.rechazado
+                        ? `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-700" title="${m.motivo_rechazo || ''}"><i class="fas fa-times-circle"></i> Rechazado</span>`
+                        : `<span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><i class="fas fa-clock"></i> Pendiente</span>`;
 
                 return `
                     <div class="p-3 bg-amber-50 rounded-xl border border-amber-100 hover:shadow-sm transition">

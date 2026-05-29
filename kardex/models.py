@@ -144,11 +144,13 @@ class Documento(models.Model):
         help_text="Para devoluciones, apunta a la salida original"
     )
 
-    # Aceptación de Traslado (firma digital)
+    # Aceptación / Rechazo de Traslado (firma digital)
     aceptado = models.BooleanField(default=False, verbose_name="Aceptado por enfermera")
+    rechazado = models.BooleanField(default=False, verbose_name="Rechazado por enfermera")
+    motivo_rechazo = models.TextField(null=True, blank=True, verbose_name="Motivo de rechazo")
     firma_nombre = models.CharField(max_length=200, null=True, blank=True, verbose_name="Nombre de quien firma")
     firma_cedula = models.CharField(max_length=50, null=True, blank=True, verbose_name="Cédula de quien firma")
-    fecha_aceptacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de aceptación")
+    fecha_aceptacion = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de aceptación o rechazo")
 
     def tiempo_agotado_para_devolucion(self):
         if self.tipo_mov != 'SALIDA':

@@ -1207,6 +1207,8 @@ def api_listar_movimientos(request):
                 'id_paciente': mov.id_paciente or '-',
                 'detalles': detalles,
                 'aceptado': mov.aceptado,
+                'rechazado': mov.rechazado,
+                'motivo_rechazo': mov.motivo_rechazo or '',
                 'firma_nombre': mov.firma_nombre or '',
                 'fecha_aceptacion': mov.fecha_aceptacion.strftime('%Y-%m-%d %H:%M') if mov.fecha_aceptacion else '',
             })
@@ -1382,16 +1384,27 @@ def api_aceptar_traslado(request):
         if not firma_nombre or not firma_cedula:
             return JsonResponse({'status': 'error', 'mensaje': 'Debe ingresar su nombre completo y número de cédula.'}, status=400)
 
+        # Validar que la cédula coincida con la registrada en el sistema
+        cedula_registrada = request.user.perfil.numero_identificacion
+        if not cedula_registrada:
+            return JsonResponse({'status': 'error', 'mensaje': 'Su usuario no tiene un número de identificación registrado en el sistema. Contacte al administrador.'}, status=400)
+        if firma_cedula != cedula_registrada:
+            return JsonResponse({'status': 'error', 'mensaje': f'La cédula ingresada no coincide con la registrada en su perfil ({cedula_registrada}).'}, status=400)
+
         doc = Documento.objects.get(id=doc_id, tipo_mov='TRASLADO')
 
         if doc.aceptado:
             return JsonResponse({'status': 'error', 'mensaje': 'Este traslado ya fue aceptado anteriormente.'}, status=400)
+        if doc.rechazado:
+            return JsonResponse({'status': 'error', 'mensaje': 'Este traslado fue rechazado. No se puede aceptar.'}, status=400)
 
         sede_user = request.user.perfil.ubicacion_asignada
         if doc.destino_id != sede_user.id:
             return JsonResponse({'status': 'error', 'mensaje': 'Solo el personal de la sede destino puede aceptar el traslado.'}, status=403)
 
         doc.aceptado = True
+        doc.rechazado = False
+        doc.motivo_rechazo = None
         doc.firma_nombre = firma_nombre
         doc.firma_cedula = firma_cedula
         doc.fecha_aceptacion = timezone.now()
@@ -1400,6 +1413,59 @@ def api_aceptar_traslado(request):
         return JsonResponse({
             'status': 'success',
             'mensaje': '✅ Traslado aceptado y firmado correctamente.',
+            'doc_id': doc.id,
+        })
+
+    except Documento.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Documento de traslado no encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def api_rechazar_traslado(request):
+    """La enfermera de la sede destino rechaza el traslado con un motivo"""
+    try:
+        data = json.loads(request.body)
+        doc_id = data.get('doc_id')
+        motivo = data.get('motivo', '').strip()
+        firma_nombre = data.get('firma_nombre', '').strip()
+        firma_cedula = data.get('firma_cedula', '').strip()
+
+        if not motivo:
+            return JsonResponse({'status': 'error', 'mensaje': 'Debe indicar el motivo del rechazo.'}, status=400)
+        if not firma_nombre or not firma_cedula:
+            return JsonResponse({'status': 'error', 'mensaje': 'Debe ingresar su nombre y cédula.'}, status=400)
+
+        # Validar cédula
+        cedula_registrada = request.user.perfil.numero_identificacion
+        if not cedula_registrada:
+            return JsonResponse({'status': 'error', 'mensaje': 'Su usuario no tiene un número de identificación registrado.'}, status=400)
+        if firma_cedula != cedula_registrada:
+            return JsonResponse({'status': 'error', 'mensaje': f'La cédula no coincide con su perfil ({cedula_registrada}).'}, status=400)
+
+        doc = Documento.objects.get(id=doc_id, tipo_mov='TRASLADO')
+
+        if doc.aceptado:
+            return JsonResponse({'status': 'error', 'mensaje': 'Este traslado ya fue aceptado. No se puede rechazar.'}, status=400)
+        if doc.rechazado:
+            return JsonResponse({'status': 'error', 'mensaje': 'Este traslado ya fue rechazado anteriormente.'}, status=400)
+
+        sede_user = request.user.perfil.ubicacion_asignada
+        if doc.destino_id != sede_user.id:
+            return JsonResponse({'status': 'error', 'mensaje': 'Solo el personal de la sede destino puede rechazar el traslado.'}, status=403)
+
+        doc.rechazado = True
+        doc.motivo_rechazo = motivo
+        doc.firma_nombre = firma_nombre
+        doc.firma_cedula = firma_cedula
+        doc.fecha_aceptacion = timezone.now()
+        doc.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'mensaje': '✅ Traslado rechazado correctamente. Se ha registrado el motivo.',
             'doc_id': doc.id,
         })
 

@@ -57,6 +57,7 @@ urlpatterns = [
     path('api/eliminar-stock/', views.api_eliminar_stock, name='api_eliminar_stock'),
     path('api/realizar-traslado/', views.api_realizar_traslado, name='api_realizar_traslado'),
     path('api/aceptar-traslado/', views.api_aceptar_traslado, name='api_aceptar_traslado'),
+    path('api/rechazar-traslado/', views.api_rechazar_traslado, name='api_rechazar_traslado'),
     path('remision-traslado/<int:doc_id>/', views.ver_remision_traslado, name='ver_remision_traslado'),
     path('api/eliminar-usuario/', views.api_eliminar_usuario, name='api_eliminar_usuario'),
     path('api/plantilla-usuarios/', views.descargar_plantilla_usuarios, name='plantilla_usuarios'),

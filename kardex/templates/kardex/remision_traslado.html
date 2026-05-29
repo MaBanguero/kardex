@@ -196,6 +196,16 @@
             font-size: 11px;
             font-weight: bold;
         }
+        .state-rejected {
+            display: inline-block;
+            background: #fce4ec;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -231,7 +241,9 @@
         <div>
             <div class="label">Estado</div>
             <div class="value">
-                {% if doc.aceptado %}
+                {% if doc.rechazado %}
+                    <span class="state-rejected">❌ Rechazado</span>
+                {% elif doc.aceptado %}
                     <span class="state-accepted">✅ Aceptado</span>
                 {% else %}
                     <span class="state-pending">⏳ Pendiente de Aceptación</span>
@@ -275,7 +287,17 @@
 
             <div class="firma-box">
                 <p style="font-size:10px;color:#888;margin-bottom:4px;">Quien recibe y acepta</p>
-                {% if doc.aceptado %}
+                {% if doc.rechazado %}
+                    <div class="firma-realizada" style="border-color:#c62828;background:#fce4ec;">
+                        <div class="check">❌</div>
+                        <div class="nombre" style="color:#c62828;">{{ doc.firma_nombre }}</div>
+                        <div class="cedula">C.C. {{ doc.firma_cedula }}</div>
+                        <div class="fecha">{{ doc.fecha_aceptacion|date:"d/m/Y H:i" }}</div>
+                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #ef9a9a;font-size:11px;">
+                            <strong>Motivo:</strong> {{ doc.motivo_rechazo }}
+                        </div>
+                    </div>
+                {% elif doc.aceptado %}
                     <div class="firma-realizada">
                         <div class="check">✅</div>
                         <div class="nombre">{{ doc.firma_nombre }}</div>
