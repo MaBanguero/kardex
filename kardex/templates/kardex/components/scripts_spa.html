@@ -62,10 +62,13 @@
         // Si un item no tiene CUPS, cae en el agrupamiento por Nombre + Forma Farmacéutica
         const grouped = {};
         filtered.forEach(item => {
-            // Clave primaria: CUPS (usa cups_codigo o codigo CUM como fallback). Secundaria: nombre + forma farmacéutica
+            // Clave primaria: CUPS (usa cups_codigo o codigo CUM como fallback). Secundaria: nombre + forma farmacéutica + presentacion
+            // Incluimos presentacion y concentracion en la clave para que diferentes
+            // presentaciones (ej: PROLENE 4-0, 5-0, 3-0) no se fusionen
             const cupsValue = item.cups_codigo || item.codigo;
-            const cupsKey = cupsValue ? `CUPS:${cupsValue}` : null;
-            const nameKey = (item.principio_activo + '||' + item.forma_farmaceutica).toUpperCase().trim();
+            const presentacionKey = (item.presentacion || '').trim();
+            const cupsKey = cupsValue ? `CUPS:${cupsValue}||${presentacionKey}` : null;
+            const nameKey = (item.principio_activo + '||' + item.forma_farmaceutica + '||' + presentacionKey).toUpperCase().trim();
             const key = cupsKey || nameKey;
 
             if (!grouped[key]) {
@@ -73,6 +76,8 @@
                     id_virtual: key.replace(/[^A-Z0-9]/g, ''), // ID seguro para el HTML
                     principio_activo: item.principio_activo,
                     forma_farmaceutica: item.forma_farmaceutica,
+                    presentacion: item.presentacion || '',
+                    concentracion: item.concentracion || '',
                     cups_codigo: item.cups_codigo || item.codigo || '',
                     cantidad_actual: 0,
                     stock_minimo: item.stock_minimo,
@@ -125,16 +130,23 @@
             return;
         }
 
+        // Helper para mostrar nombre + presentacion/concentracion legible
+        function nombrePresentacion(item) {
+            let sufijo = (item.concentracion || item.presentacion || '').trim();
+            return sufijo ? item.principio_activo + ' ' + sufijo : item.principio_activo;
+        }
+
         let mHtml = '', dHtml = '';
         items.forEach(i => {
             const low = i.cantidad_actual <= i.stock_minimo;
+            const nombreCompleto = nombrePresentacion(i);
             const badge = `<span class="text-[10px] font-bold bg-slate-100 border border-slate-200 px-2 py-1 rounded shadow-sm text-slate-600"><i class="fas fa-layer-group mr-1 opacity-50"></i>${i.lote_txt}</span>`;
             const semaforoBadge = i.semaforo ? `<span class="semaforo-badge semaforo-${i.semaforo.toLowerCase()}">${i.semaforo}</span>` : '';
 
             mHtml += `
             <div class="p-6 border-b border-slate-100">
                 <div class="flex justify-between items-start mb-4">
-                    <div class="pr-4"><h4 class="font-bold text-slate-900 leading-tight">${i.principio_activo}</h4><p class="text-[10px] text-slate-500 uppercase mt-1 font-bold">${i.forma_farmaceutica}</p></div>
+                    <div class="pr-4"><h4 class="font-bold text-slate-900 leading-tight">${nombreCompleto}</h4><p class="text-[10px] text-slate-500 uppercase mt-1 font-bold">${i.forma_farmaceutica}</p></div>
                     <div class="text-right"><span id="stock-qty-mob-${i.id_virtual}" class="text-3xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></div>
                 </div>
                 <div class="flex gap-3 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -146,7 +158,7 @@
 
             dHtml += `
             <tr class="hover:bg-slate-50 transition">
-                <td class="px-6 py-5"><p class="font-bold text-slate-800">${i.principio_activo}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
+                <td class="px-6 py-5"><p class="font-bold text-slate-800">${nombreCompleto}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
                 <td class="px-6 py-5">${badge}${semaforoBadge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
                 <td class="px-6 py-5 text-center"><span id="stock-qty-${i.id_virtual}" class="text-2xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></td>
                 <td class="px-6 py-5 text-right"><button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}', '${i.cups_codigo || ''}')" class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
