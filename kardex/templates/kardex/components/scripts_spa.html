@@ -58,18 +58,14 @@
         const data = JSON.parse(dataRaw);
         const filtered = query === '' ? data : data.filter(i => i.busqueda.includes(query));
 
-        // MAGIA: Agrupamos por código CUPS principalmente
-        // Si un item no tiene CUPS, cae en el agrupamiento por Nombre + Forma Farmacéutica
+        // Agrupamos solo por nombre + forma farmacéutica + presentacion/concentracion.
+        // NO agrupamos por CUPS/CUM porque distintas presentaciones de un mismo
+        // producto (ej: PROLENE 4-0, 5-0, 3-0) pueden compartir código pero
+        // deben aparecer por separado.
         const grouped = {};
         filtered.forEach(item => {
-            // Clave primaria: CUPS (usa cups_codigo o codigo CUM como fallback). Secundaria: nombre + forma farmacéutica + presentacion
-            // Incluimos presentacion y concentracion en la clave para que diferentes
-            // presentaciones (ej: PROLENE 4-0, 5-0, 3-0) no se fusionen
-            const cupsValue = item.cups_codigo || item.codigo;
-            const presentacionKey = (item.presentacion || '').trim();
-            const cupsKey = cupsValue ? `CUPS:${cupsValue}||${presentacionKey}` : null;
-            const nameKey = (item.principio_activo + '||' + item.forma_farmaceutica + '||' + presentacionKey).toUpperCase().trim();
-            const key = cupsKey || nameKey;
+            const presentacionVal = (item.presentacion || item.concentracion || '').trim();
+            const key = (item.principio_activo + '||' + item.forma_farmaceutica + '||' + presentacionVal).toUpperCase().trim();
 
             if (!grouped[key]) {
                 grouped[key] = {
