@@ -340,7 +340,7 @@
 
     // 0. Cargar estado global de alertas al iniciar
     (function cargarEstadoAlertas() {
-        fetch("{% url 'api_estado_alertas' %}", {method: 'POST'})
+        fetch("{% url 'api_estado_alertas' %}", {method: 'GET'})
             .then(r => r.json())
             .then(d => { window.alertasHabilitadas = d.alertas_habilitadas !== false; })
             .catch(() => { window.alertasHabilitadas = true; });
@@ -349,10 +349,18 @@
     // 2. Sincronización y Renderizado de Inventario
     function cargarTablaAdmin() {
         fetch("{% url 'sincronizar_inventario_api' %}")
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('Error ' + res.status + ' al cargar inventario');
+                return res.json();
+            })
             .then(data => {
                 window.adminCache = data.inventario;
                 renderAdminTable(data.inventario);
+            })
+            .catch(err => {
+                console.error('cargarTablaAdmin:', err);
+                const body = document.getElementById('admin-table-body');
+                if (body) body.innerHTML = '<tr><td colspan="5" class="p-12 text-center text-red-400 italic">Error al cargar: ' + err.message + '</td></tr>';
             });
     }
 
@@ -376,7 +384,7 @@
         // Filtrar por sede (solo admin ve todas)
         const sedeFiltro = window.adminSedeFiltro || 'TODAS';
         if(sedeFiltro !== 'TODAS') {
-            items = items.filter(i => i.ubicacion_nombre === sedeFiltro);
+            items = items.filter(i => i.ubicacion_nombre && i.ubicacion_nombre.trim() === sedeFiltro.trim());
         }
 
         // Agrupar por sede si estamos viendo todas (opcional, visual)
@@ -446,10 +454,10 @@
                                 <i class="fas fa-clock fa-spin"></i> Pedido en Curso
                             </span>
                         ` : ''}
-                        <button onclick='editarProducto(${JSON.stringify(i)})' class="text-slate-300 hover:text-blue-600 transition p-2" title="Editar">
+                        <button onclick='editarProducto(${JSON.stringify(i).replace(/'/g, "\\u0027")})' class="text-slate-300 hover:text-blue-600 transition p-2" title="Editar">
                             <i class="fas fa-edit text-lg"></i>
                         </button>
-                        <button onclick="eliminarStock(${i.id}, '${i.principio_activo} - Lote ${i.lote}')" class="text-slate-300 hover:text-red-600 transition p-2" title="Eliminar (solo si stock=0)">
+                        <button onclick='eliminarStock(${i.id}, ${JSON.stringify(i.principio_activo + " - Lote " + i.lote).replace(/'/g, "\\u0027")})' class="text-slate-300 hover:text-red-600 transition p-2" title="Eliminar (solo si stock=0)">
                             <i class="fas fa-trash-alt text-lg"></i>
                         </button>
                     </td>

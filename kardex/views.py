@@ -260,6 +260,8 @@ def sincronizar_inventario_api(request):
             'stock_minimo': item.stock_minimo,
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
+            'vida_util': item.medicamento.vida_util or '',
+            'clasificacion_riesgo': item.medicamento.clasificacion_riesgo or '',
             'cups_codigo': item.medicamento.cups_codigo or '',
             'ubicacion_id': item.ubicacion_id,
             'ubicacion_nombre': item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else '',
@@ -1136,9 +1138,8 @@ def api_gestion_configuracion(request):
 
 # ==============================================================================
 @login_required
-@require_POST
 def api_estado_alertas(request):
-    """Endpoint rápido para saber si las alertas están habilitadas (público para admins)"""
+    """Endpoint rápido para saber si las alertas están habilitadas"""
     config = ConfiguracionSistema.objects.first()
     habilitadas = config.alertas_habilitadas if config else True
     return JsonResponse({'alertas_habilitadas': habilitadas})
