@@ -516,12 +516,16 @@ def api_gestion_producto(request):
                 )
                 medicamento.forma_farmaceutica = forma_farmaceutica
             else:
-                # Para MEDICAMENTO: lookup por principio_activo + forma_farmaceutica
+                # Para MEDICAMENTO: lookup por principio_activo + forma_farmaceutica + concentracion
+                # para que diferentes concentraciones (ej: PROLENE 4-0, 5-0, 3-0) sean registros distintos
                 if not forma_farmaceutica:
                     raise ValueError('La forma farmacéutica es obligatoria para medicamentos.')
+                lookup_concentracion = data.get('concentracion', '').strip() or None
                 medicamento, _ = Medicamento.objects.get_or_create(
                     principio_activo=principio_activo,
-                    forma_farmaceutica=forma_farmaceutica
+                    forma_farmaceutica=forma_farmaceutica,
+                    concentracion=lookup_concentracion,
+                    defaults={'tipo': tipo_val}
                 )
 
             # Control de nulos para campos únicos

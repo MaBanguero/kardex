@@ -1101,9 +1101,12 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 )
             else:
                 forma = row.get('forma_farmaceutica', row.get('forma', '')).strip().upper()
+                conc = row.get('concentracion', '').strip() or None
                 medicamento, _ = Medicamento.objects.get_or_create(
                     principio_activo=principio,
-                    forma_farmaceutica=forma
+                    forma_farmaceutica=forma,
+                    concentracion=conc,
+                    defaults={'tipo': tipo}
                 )
 
             # --- Campos comunes ---
