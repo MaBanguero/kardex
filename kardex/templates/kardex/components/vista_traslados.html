@@ -1,0 +1,158 @@
+<div id="vista-traslados" class="hidden animate-fade-in">
+    <div class="mb-6">
+        <h2 class="text-2xl font-black text-slate-800 mb-2">🚚 traslados</h2>
+        <p class="text-slate-500 text-sm">Traslados recibidos desde bodega central. Verifica las cantidades y confirma o rechaza.</p>
+    </div>
+
+    <div id="contenedor-traslados-nurse" class="space-y-3">
+        <div class="text-center py-8 text-slate-400 italic">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Cargando traslados...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Si el tab de traslados esta activo por defecto (no lo esta), cargar
+});
+
+function cargarTrasladosPendientes() {
+    const cont = document.getElementById('contenedor-traslados-nurse');
+    cont.innerHTML = '<div class="text-center py-8 text-slate-400 italic"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Cargando traslados...</p></div>';
+
+    fetch("{% url 'api_listar_movimientos' %}")
+        .then(r => r.json())
+        .then(d => {
+            if (d.status !== 'success') {
+                cont.innerHTML = '<div class="text-center p-8 text-slate-400 italic">Error al cargar traslados.</div>';
+                return;
+            }
+
+            const traslados = (d.movimientos || []).filter(m =>
+                m.tipo_mov === 'TRASLADO' && m.destino === '{{ ubicacion.nombre }}'
+            );
+
+            if (traslados.length === 0) {
+                cont.innerHTML = '<div class="text-center p-12 text-slate-400 italic border-2 border-dashed border-slate-100 rounded-xl"><i class="fas fa-inbox text-3xl mb-2 opacity-50 block"></i>No hay traslados registrados para esta sede.</div>';
+                return;
+            }
+
+            cont.innerHTML = traslados.map(m => {
+                const detHtml = (m.detalles || []).map(det =>
+                    `<span class="inline-block text-[10px] bg-white border border-slate-100 px-2 py-0.5 rounded font-bold">${det.cantidad}x ${det.medicamento} (${det.lote})</span>`
+                ).join(' ');
+
+                let estadoBadge, acciones;
+                if (m.aceptado) {
+                    estadoBadge = '<span class="text-[9px] font-black uppercase px-2 py-1 rounded bg-emerald-100 text-emerald-700"><i class="fas fa-check-circle"></i> Aceptado por ' + (m.firma_nombre || '—') + '</span>';
+                    acciones = '';
+                } else if (m.rechazado) {
+                    estadoBadge = '<span class="text-[9px] font-black uppercase px-2 py-1 rounded bg-red-100 text-red-700" title="' + (m.motivo_rechazo || '') + '"><i class="fas fa-times-circle"></i> Rechazado</span>';
+                    acciones = '';
+                } else {
+                    estadoBadge = '<span class="text-[9px] font-black uppercase px-2 py-1 rounded bg-amber-100 text-amber-700"><i class="fas fa-clock"></i> Pendiente</span>';
+                    acciones = `
+                        <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <a href="/kardex/remision-traslado/${m.id}/" target="_blank"
+                               class="text-[10px] font-bold text-blue-600 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-50 transition">
+                                <i class="fas fa-file-alt mr-1"></i> Ver Remisión
+                            </a>
+                            <button onclick="abrirModalAceptarTraslado(${m.id})"
+                                    class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-emerald-600 transition shadow-sm">
+                                <i class="fas fa-check-circle mr-1"></i> Aceptar
+                            </button>
+                            <button onclick="rechazarTraslado(${m.id})"
+                                    class="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-red-600 transition shadow-sm">
+                                <i class="fas fa-times-circle mr-1"></i> Rechazar
+                            </button>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">Traslado #${m.id}</span>
+                                <span class="text-[9px] text-slate-400">${m.fecha}</span>
+                            </div>
+                            ${estadoBadge}
+                        </div>
+                        <div class="flex flex-wrap gap-1 mb-2">${detHtml}</div>
+                        <p class="text-[10px] text-slate-500">
+                            <i class="fas fa-arrow-right text-amber-500 mr-1"></i> ${m.origen} → ${m.destino}
+                        </p>
+                        ${acciones}
+                    </div>
+                `;
+            }).join('');
+        })
+        .catch(err => {
+            cont.innerHTML = '<div class="text-center p-8 text-red-400 italic">Error al cargar: ' + err.message + '</div>';
+        });
+}
+
+function abrirModalAceptarTraslado(docId) {
+    const nombre = prompt('Ingrese su nombre completo:');
+    if (!nombre || !nombre.trim()) return;
+    const cedula = prompt('Ingrese su número de cédula (debe coincidir con la registrada en el sistema):');
+    if (!cedula || !cedula.trim()) return;
+
+    fetch("{% url 'api_aceptar_traslado' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            doc_id: docId,
+            firma_nombre: nombre.trim(),
+            firma_cedula: cedula.trim()
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'success') {
+            alert('✅ ' + d.mensaje);
+            cargarTrasladosPendientes();
+        } else {
+            alert('❌ ' + d.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err.message));
+}
+
+function rechazarTraslado(docId) {
+    const nombre = prompt('Ingrese su nombre completo:');
+    if (!nombre || !nombre.trim()) return;
+    const cedula = prompt('Ingrese su número de cédula (debe coincidir con la registrada):');
+    if (!cedula || !cedula.trim()) return;
+    const motivo = prompt('Describa el motivo del rechazo (ej: cantidades físicas no coinciden):');
+    if (!motivo || !motivo.trim()) return;
+
+    fetch("{% url 'api_rechazar_traslado' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            doc_id: docId,
+            firma_nombre: nombre.trim(),
+            firma_cedula: cedula.trim(),
+            motivo: motivo.trim()
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.status === 'success') {
+            alert('✅ ' + d.mensaje);
+            cargarTrasladosPendientes();
+        } else {
+            alert('❌ ' + d.mensaje);
+        }
+    })
+    .catch(err => alert('❌ Error de red: ' + err.message));
+}
+</script>

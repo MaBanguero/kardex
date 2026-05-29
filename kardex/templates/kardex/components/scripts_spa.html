@@ -162,21 +162,27 @@
     // 4. LÓGICA DE PESTAÑAS (TABS)
     // ==========================================
     function cambiarPestaña(tab) {
-        const btnI = document.getElementById('tab-inventario'), btnH = document.getElementById('tab-historial');
-        const vI = document.getElementById('vista-inventario'), vH = document.getElementById('vista-historial');
+        const btnI = document.getElementById('tab-inventario'), btnH = document.getElementById('tab-historial'), btnT = document.getElementById('tab-traslados');
+        const vI = document.getElementById('vista-inventario'), vH = document.getElementById('vista-historial'), vT = document.getElementById('vista-traslados');
+
+        [btnI, btnH, btnT].forEach(b => {
+            if (b) b.className = "flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
+        });
+        [vI, vH, vT].forEach(v => {
+            if (v) v.classList.add('hidden');
+        });
 
         if (tab === 'inventario') {
-            vI.classList.replace('hidden', 'block');
-            vH.classList.replace('block', 'hidden');
-            btnI.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
-            btnH.className = "flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
-        } else {
-            vH.classList.replace('hidden', 'block');
-            vI.classList.replace('block', 'hidden');
-            btnH.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
-            btnI.className = "flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition-all duration-200";
-
+            if (vI) vI.classList.replace('hidden', 'block');
+            if (btnI) btnI.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
+        } else if (tab === 'historial') {
+            if (vH) vH.classList.replace('hidden', 'block');
+            if (btnH) btnH.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
             cargarHistorial();
+        } else if (tab === 'traslados') {
+            if (vT) vT.classList.replace('hidden', 'block');
+            if (btnT) btnT.className = "flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-blue-700 shadow-sm transition-all duration-200";
+            cargarTrasladosPendientes();
         }
     }
 
