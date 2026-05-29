@@ -281,20 +281,29 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                 'cantidad_actual__gt': 0,
             }
             if cups_codigo:
-                # Buscar por cups_codigo; si no hay match, probar por codigo (CUM)
+                # Buscar por CUPS + nombre para evitar que un CUPS compartido
+                # entre varios productos descuente del equivocado
                 stocks_disponibles = InventarioStock.objects.select_for_update().filter(
                     ubicacion_id=ubicacion_id,
                     medicamento__cups_codigo=cups_codigo,
+                    medicamento__principio_activo__iexact=nombre_medicamento.strip(),
                     cantidad_actual__gt=0
                 ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
 
                 if not stocks_disponibles.exists():
-                    # Fallback: buscar por codigo (CUM) ya que el frontend
-                    # usa codigo como cups_codigo cuando no hay CUPS explícito
+                    # Fallback: buscar por codigo (CUM) + nombre
                     stocks_disponibles = InventarioStock.objects.select_for_update().filter(
                         ubicacion_id=ubicacion_id,
                         medicamento__codigo=cups_codigo,
+                        medicamento__principio_activo__iexact=nombre_medicamento.strip(),
                         cantidad_actual__gt=0
+                    ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
+
+                if not stocks_disponibles.exists():
+                    # Ultimo fallback: solo por nombre
+                    filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
+                    stocks_disponibles = InventarioStock.objects.select_for_update().filter(
+                        **filtro
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
             else:
                 filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
