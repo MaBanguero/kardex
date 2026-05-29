@@ -456,6 +456,16 @@ def admin_dashboard_view(request):
         solicitudes = SolicitudStock.objects.select_related('medicamento', 'sede_solicitante').filter(
             sede_solicitante=request.user.perfil.ubicacion_asignada).order_by('-fecha_solicitud')
 
+    # Turnos activos: admin ve todas las sedes, regente solo su sede
+    if es_admin:
+        turnos_activos = TurnoEnfermera.objects.filter(
+            activo=True,
+            fecha_expiracion__gt=timezone.now()
+        ).select_related('enfermera', 'sede').order_by('sede__nombre', '-fecha_inicio')
+    else:
+        turno = get_turno_activo(request.user.perfil.ubicacion_asignada)
+        turnos_activos = [turno] if turno else []
+
     return render(request, 'kardex/admin_dashboard.html', {
         'es_admin': es_admin,
         'es_regente': es_regente,
@@ -470,6 +480,7 @@ def admin_dashboard_view(request):
         ).distinct().order_by('principio_activo'),
         'tipos_medicamento': Medicamento.TIPOS,
         'turno_activo': get_turno_activo(request.user.perfil.ubicacion_asignada),
+        'turnos_activos': turnos_activos,
         'conciliaciones': Conciliacion.objects.select_related('carga_rips').order_by('-fecha_conciliacion')[:5],
     })
 
