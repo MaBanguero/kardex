@@ -268,7 +268,10 @@ def sincronizar_inventario_api(request):
             'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''} {item.medicamento.codigo or ''} {item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else ''}".lower(),
             'en_tramite': item.medicamento.id in meds_pendientes
         })
-    return JsonResponse({'inventario': data})
+    response = JsonResponse({'inventario': data})
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    return response
 
 
 # ==========================================
@@ -286,9 +289,10 @@ def registrar_movimiento_view(request):
         if tipo == 'SALIDA':
             nombre_med = data.get('nombre_medicamento')
             cups_codigo = data.get('cups_codigo')
+            codigo = data.get('codigo')
             registrar_salida_paciente_inteligente(
                 request.user, nombre_med, cantidad, id_paciente,
-                cups_codigo=cups_codigo
+                cups_codigo=cups_codigo, codigo=codigo
             )
             return JsonResponse({'status': 'success', 'requiere_sincronizacion': True})
 

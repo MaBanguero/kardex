@@ -143,7 +143,7 @@
                     <div class="flex-1"><p class="text-[9px] font-bold text-slate-400 mb-1">LOTE</p>${badge}</div>
                     <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VENCE</p><p class="text-[11px] font-bold text-slate-600">${i.fecha_txt}</p>${semaforoBadge}</div>
                 </div>
-               <button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}', '${i.cups_codigo || ''}')" class="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition">Registrar Movimiento</button>
+               <button onclick='abrirModal(${JSON.stringify(i.id_virtual)}, ${JSON.stringify(i.principio_activo).replace(/'/g, "\\u0027")}, ${JSON.stringify(i.cups_codigo || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.codigo || "").replace(/'/g, "\\u0027")})' class="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition">Registrar Movimiento</button>
             </div>`;
 
             dHtml += `
@@ -151,7 +151,7 @@
                 <td class="px-6 py-5"><p class="font-bold text-slate-800">${nombreCompleto}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
                 <td class="px-6 py-5">${badge}${semaforoBadge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
                 <td class="px-6 py-5 text-center"><span id="stock-qty-${i.id_virtual}" class="text-2xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></td>
-                <td class="px-6 py-5 text-right"><button onclick="abrirModal('${i.id_virtual}', '${i.principio_activo}', '${i.cups_codigo || ''}')" class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
+                <td class="px-6 py-5 text-right"><button onclick='abrirModal(${JSON.stringify(i.id_virtual)}, ${JSON.stringify(i.principio_activo).replace(/'/g, "\\u0027")}, ${JSON.stringify(i.cups_codigo || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.codigo || "").replace(/'/g, "\\u0027")})' class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
             </tr>`;
         });
         contMov.innerHTML = mHtml;
@@ -239,10 +239,11 @@
     const modalContainer = document.getElementById('modal-container');
     const modalBox = document.getElementById('modal-box');
 
-    function abrirModal(id_virtual, nombre, cups_codigo) {
+    function abrirModal(id_virtual, nombre, cups_codigo, codigo) {
         document.getElementById('modal-id-med').value = id_virtual; // Guarda el ID Virtual
         document.getElementById('modal-nombre-med').innerText = nombre;
         document.getElementById('modal-cups').value = cups_codigo || '';
+        document.getElementById('modal-codigo').value = codigo || '';
         document.getElementById('modal-paciente').value = '';
         document.getElementById('modal-cantidad').value = '';
 
@@ -301,10 +302,12 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...';
 
         const cupsCodigo = document.getElementById('modal-cups').value;
+        const codigoVal = document.getElementById('modal-codigo').value;
         const payload = {
             tipo_mov: document.getElementById('modal-tipo').value,
-            nombre_medicamento: document.getElementById('modal-nombre-med').innerText, // Enviamos el nombre
+            nombre_medicamento: document.getElementById('modal-nombre-med').innerText,
             cups_codigo: cupsCodigo || null,
+            codigo: codigoVal || null,
             id_paciente: document.getElementById('modal-paciente').value,
             cantidad: parseInt(document.getElementById('modal-cantidad').value)
         };
