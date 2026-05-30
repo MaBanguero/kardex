@@ -611,7 +611,12 @@ def api_gestion_producto(request):
     except ValueError as ve:
         return JsonResponse({'status': 'error', 'mensaje': str(ve)}, status=400)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+        from django.core.exceptions import ValidationError
+        if isinstance(e, ValidationError):
+            msg = e.messages[0] if e.messages else str(e)
+        else:
+            msg = str(e)
+        return JsonResponse({'status': 'error', 'mensaje': msg}, status=400)
 
 
 @login_required
