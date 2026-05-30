@@ -265,7 +265,7 @@ def registrar_salida_paciente(usuario, stock_id, cantidad, id_paciente):
         )
         return doc
 
-def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente, cups_codigo=None, presentacion=None):
+def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_solicitada, id_paciente, cups_codigo=None):
     """
     Descuenta stock automáticamente del lote más próximo a vencer (FEFO).
     Si se proporciona cups_codigo, busca por CUPS; de lo contrario busca por nombre.
@@ -307,9 +307,6 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
                     ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))
             else:
                 filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
-                if presentacion:
-                    filtro['medicamento__presentacion'] = presentacion.strip()
-
                 stocks_disponibles = InventarioStock.objects.select_for_update().filter(
                     **filtro
                 ).order_by(Coalesce('fecha_vencimiento', V('9999-12-31')))

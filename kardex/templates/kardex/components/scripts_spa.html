@@ -307,12 +307,11 @@
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...';
 
-        const presentacionVal = document.getElementById('modal-presentacion').value;
         const payload = {
             tipo_mov: document.getElementById('modal-tipo').value,
             nombre_medicamento: document.getElementById('modal-nombre-med').innerText,
-            cups_codigo: null,  // No enviamos CUPS desde enfermera, solo busca por nombre
-            presentacion: presentacionVal || null,
+            cups_codigo: null,
+            presentacion: null,
             id_paciente: document.getElementById('modal-paciente').value,
             cantidad: parseInt(document.getElementById('modal-cantidad').value)
         };
