@@ -288,10 +288,10 @@ def registrar_movimiento_view(request):
 
         if tipo == 'SALIDA':
             nombre_med = data.get('nombre_medicamento')
-            cups_codigo = data.get('cups_codigo')
+            medicamento_id = data.get('medicamento_id')
             registrar_salida_paciente_inteligente(
                 request.user, nombre_med, cantidad, id_paciente,
-                cups_codigo=cups_codigo
+                medicamento_id=medicamento_id
             )
             return JsonResponse({'status': 'success', 'requiere_sincronizacion': True})
 
