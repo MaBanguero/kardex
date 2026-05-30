@@ -545,12 +545,6 @@ def api_gestion_producto(request):
             # Control de nulos para campos únicos
             codigo_ingresado = data.get('codigo', '').strip()
             if codigo_ingresado:
-                # Verificar que el código no esté duplicado en otro medicamento
-                codigo_qs = Medicamento.objects.filter(codigo=codigo_ingresado)
-                if medicamento.pk:
-                    codigo_qs = codigo_qs.exclude(pk=medicamento.pk)
-                if codigo_qs.exists():
-                    raise ValueError(f"El código '{codigo_ingresado}' ya está registrado en otro producto.")
                 medicamento.codigo = codigo_ingresado
             else:
                 medicamento.codigo = None

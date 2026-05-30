@@ -84,7 +84,7 @@ class Medicamento(models.Model):
     )
 
     tipo = models.CharField(max_length=20, choices=TIPOS, default='MEDICAMENTO')
-    codigo = models.CharField(max_length=50, unique=True, null=True, blank=True, help_text="Código ATC, CUM o interno")
+    codigo = models.CharField(max_length=50, null=True, blank=True, help_text="Código ATC, CUM o interno")
     principio_activo = models.CharField(max_length=150, verbose_name="Nombre / Principio Activo")
     concentracion = models.CharField(max_length=100, null=True, blank=True, help_text="Ej: 500mg, 0.3%, 1g")
     forma_farmaceutica = models.CharField(max_length=100, help_text="Ej: Tableta, Solución, Jarabe")

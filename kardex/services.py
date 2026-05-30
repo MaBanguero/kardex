@@ -1100,9 +1100,6 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
             # --- Campos comunes ---
             medicamento.tipo = tipo
             codigo_val = row.get('codigo', '').strip() or None
-            # Si el codigo ya está en uso por otro medicamento, no forzar
-            if codigo_val and Medicamento.objects.filter(codigo=codigo_val).exclude(id=medicamento.id).exists():
-                codigo_val = None
             medicamento.codigo = codigo_val
             medicamento.presentacion = row.get('presentacion', '')
             medicamento.laboratorio = row.get('laboratorio', '')
