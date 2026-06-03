@@ -90,9 +90,13 @@
                                 <option value="CAJA">Caja</option>
                             </select>
                         </div>
-                        <div class="sm:col-span-2">
+                        <div class="sm:col-span-2 md:col-span-1">
                             <label id="lbl-laboratorio" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
                             <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none text-slate-600">
+                        </div>
+                        <div class="sm:col-span-2 md:col-span-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Registro INVIMA</label>
+                            <input type="text" id="prod-registro-invima" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-mono text-slate-600" placeholder="Ej: 2020M-0012345">
                         </div>
                         <div id="field-clasif-riesgo" class="sm:col-span-2 hidden">
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Clasificación de Riesgo (INVIMA)</label>
@@ -233,6 +237,7 @@
         document.getElementById('prod-presentacion').value = item.presentacion || "";
         document.getElementById('prod-unidad-medida').value = item.unidad_medida || "";
         document.getElementById('prod-laboratorio').value = item.laboratorio || "";
+        document.getElementById('prod-registro-invima').value = item.registro_invima || "";
         document.getElementById('prod-vida-util').value = item.vida_util || "";
         document.getElementById('prod-clasif-riesgo').value = item.clasificacion_riesgo || "";
         document.getElementById('prod-lote').value = item.lote || "";
@@ -263,6 +268,7 @@
             unidad_medida: document.getElementById('prod-unidad-medida').value,
             presentacion: document.getElementById('prod-presentacion').value,
             laboratorio: document.getElementById('prod-laboratorio').value,
+            registro_invima: document.getElementById('prod-registro-invima').value,
             vida_util: document.getElementById('prod-vida-util').value,
             clasificacion_riesgo: document.getElementById('prod-clasif-riesgo').value,
             lote: document.getElementById('prod-lote').value,

@@ -261,6 +261,7 @@ def sincronizar_inventario_api(request):
             'tipo': item.medicamento.tipo,
             'semaforo': semaforo,
             'vida_util': item.medicamento.vida_util or '',
+            'registro_invima': item.medicamento.registro_invima or '',
             'clasificacion_riesgo': item.medicamento.clasificacion_riesgo or '',
             'cups_codigo': item.medicamento.cups_codigo or '',
             'unidad_medida': item.medicamento.unidad_medida or '',
@@ -553,6 +554,7 @@ def api_gestion_producto(request):
             medicamento.concentracion = data.get('concentracion', medicamento.concentracion) if tipo_val == 'MEDICAMENTO' else None
             medicamento.presentacion = data.get('presentacion', medicamento.presentacion)
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
+            medicamento.registro_invima = data.get('registro_invima', medicamento.registro_invima)
             medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
             medicamento.clasificacion_riesgo = data.get('clasificacion_riesgo', medicamento.clasificacion_riesgo)
             medicamento.cups_codigo = cups_codigo
