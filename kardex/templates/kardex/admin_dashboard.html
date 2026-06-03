@@ -128,6 +128,7 @@
                         <tr>
                             <th class="px-4 md:px-6 py-4">Medicamento</th>
                             <th class="px-4 md:px-6 py-4 text-center">Unidad</th>
+                            <th class="px-4 md:px-6 py-4 text-center">Vida Útil</th>
                             <th class="px-4 md:px-6 py-4">Sede</th>
                             <th class="px-4 md:px-6 py-4">Lote / Vence</th>
                             <th class="px-4 md:px-6 py-4 text-center">Stock Actual</th>
@@ -420,7 +421,7 @@
             .catch(err => {
                 console.error('cargarTablaAdmin:', err);
                 const body = document.getElementById('admin-table-body');
-                if (body) body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-red-400 italic">Error al cargar: ' + err.message + '</td></tr>';
+                if (body) body.innerHTML = '<tr><td colspan="7" class="p-12 text-center text-red-400 italic">Error al cargar: ' + err.message + '</td></tr>';
             });
     }
 
@@ -430,7 +431,7 @@
         let htmlAlertas = '';
 
         if(!items.length) {
-            body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-slate-400 italic">No hay productos registrados.</td></tr>';
+            body.innerHTML = '<tr><td colspan="7" class="p-12 text-center text-slate-400 italic">No hay productos registrados.</td></tr>';
             alertasContainer.innerHTML = '';
             return;
         }
@@ -490,6 +491,9 @@
                     </td>
                     <td class="px-6 py-5 text-center">
                         <span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-100">${i.unidad_medida || '—'}</span>
+                    </td>
+                    <td class="px-6 py-5 text-center">
+                        <span class="text-[10px] font-bold bg-orange-50 text-orange-700 px-2.5 py-1 rounded border border-orange-200">${i.vida_util || '—'}</span>
                     </td>
                     <td class="px-6 py-5">
                         <span class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded border border-purple-100 whitespace-nowrap">
