@@ -99,6 +99,8 @@ class Medicamento(models.Model):
                                             help_text="Clasificación de riesgo INVIMA: I, IIa, IIb, III")
     cups_codigo = models.CharField(max_length=20, null=True, blank=True,
                                    help_text="Código CUPS del RIPS (ej: 70005, 70174). Se usa para conciliación automática.")
+    unidad_medida = models.CharField(max_length=50, null=True, blank=True,
+                                      help_text="Ej: Tableta, Ampolleta, mL, Gramo")
 
     def __str__(self):
         conc = f" {self.concentracion}" if self.concentracion else ""
@@ -109,7 +111,7 @@ class InventarioStock(models.Model):
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.CASCADE)
     medicamento = models.ForeignKey(Medicamento, on_delete=models.CASCADE)
     lote = models.CharField(max_length=50)
-    fecha_vencimiento = models.DateField()
+    fecha_vencimiento = models.DateField(null=True, blank=True)
     cantidad_actual = models.PositiveIntegerField(default=0)
     stock_minimo = models.PositiveIntegerField(default=10)
 

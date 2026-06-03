@@ -67,6 +67,29 @@
                             <label id="lbl-presentacion" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Presentación</label>
                             <input type="text" id="prod-presentacion" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Ej: Caja x 30">
                         </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Unidad de Medida</label>
+                            <select id="prod-unidad-medida" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-slate-700">
+                                <option value="">Seleccione...</option>
+                                <option value="TABLETA">Tableta</option>
+                                <option value="CAPSULA">Cápsula</option>
+                                <option value="AMPOLETA">Ampolleta</option>
+                                <option value="ML">mL</option>
+                                <option value="G">g</option>
+                                <option value="MG">mg</option>
+                                <option value="UNIDAD">Unidad</option>
+                                <option value="FRASCO">Frasco</option>
+                                <option value="INHALADOR">Inhalador</option>
+                                <option value="CREMA">Crema / Pomada</option>
+                                <option value="PARCHE">Parche</option>
+                                <option value="SUPOSITORIO">Supositorio</option>
+                                <option value="GOTA">Gota</option>
+                                <option value="SOBRE">Sobre</option>
+                                <option value="JERINGA">Jeringa</option>
+                                <option value="BOLSA">Bolsa</option>
+                                <option value="CAJA">Caja</option>
+                            </select>
+                        </div>
                         <div class="sm:col-span-2">
                             <label id="lbl-laboratorio" class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Laboratorio / Marca</label>
                             <input type="text" id="prod-laboratorio" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-4 focus:ring-blue-500/10 outline-none text-slate-600">
@@ -208,6 +231,7 @@
         document.getElementById('prod-forma').value = item.forma_farmaceutica || "";
         document.getElementById('prod-concentracion').value = item.concentracion || "";
         document.getElementById('prod-presentacion').value = item.presentacion || "";
+        document.getElementById('prod-unidad-medida').value = item.unidad_medida || "";
         document.getElementById('prod-laboratorio').value = item.laboratorio || "";
         document.getElementById('prod-vida-util').value = item.vida_util || "";
         document.getElementById('prod-clasif-riesgo').value = item.clasificacion_riesgo || "";
@@ -236,6 +260,7 @@
             cups_codigo: document.getElementById('prod-cups').value,
             forma_farmaceutica: formaVal,
             concentracion: document.getElementById('prod-concentracion').value,
+            unidad_medida: document.getElementById('prod-unidad-medida').value,
             presentacion: document.getElementById('prod-presentacion').value,
             laboratorio: document.getElementById('prod-laboratorio').value,
             vida_util: document.getElementById('prod-vida-util').value,

@@ -263,6 +263,7 @@ def sincronizar_inventario_api(request):
             'vida_util': item.medicamento.vida_util or '',
             'clasificacion_riesgo': item.medicamento.clasificacion_riesgo or '',
             'cups_codigo': item.medicamento.cups_codigo or '',
+            'unidad_medida': item.medicamento.unidad_medida or '',
             'ubicacion_id': item.ubicacion_id,
             'ubicacion_nombre': item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else '',
             'busqueda': f"{item.medicamento.principio_activo} {item.lote} {item.medicamento.cups_codigo or ''} {item.medicamento.codigo or ''} {item.ubicacion.nombre if hasattr(item, 'ubicacion') and item.ubicacion else ''}".lower(),
@@ -555,6 +556,7 @@ def api_gestion_producto(request):
             medicamento.vida_util = data.get('vida_util', medicamento.vida_util)
             medicamento.clasificacion_riesgo = data.get('clasificacion_riesgo', medicamento.clasificacion_riesgo)
             medicamento.cups_codigo = cups_codigo
+            medicamento.unidad_medida = data.get('unidad_medida', medicamento.unidad_medida)
             medicamento.save()
 
             lote_raw = data.get('lote')

@@ -993,7 +993,7 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
 
     Columnas completas:
       tipo, principio_activo, forma_farmaceutica, concentracion,
-      presentacion, laboratorio, codigo, registro_invima,
+      presentacion, unidad_medida, laboratorio, codigo, registro_invima,
       vida_util, clasificacion_riesgo,
       lote, fecha_vencimiento, cantidad, stock_minimo
     """
@@ -1104,6 +1104,7 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
             medicamento.presentacion = row.get('presentacion', '')
             medicamento.laboratorio = row.get('laboratorio', '')
             medicamento.registro_invima = row.get('registro_invima', '')
+            medicamento.unidad_medida = row.get('unidad_medida', '').strip().upper()
 
             medicamento.cups_codigo = cups_codigo
 
@@ -1275,6 +1276,7 @@ def generar_plantilla_xlsx():
         ("forma_farmaceutica", True),
         ("concentracion", False),
         ("presentacion", True),
+        ("unidad_medida", False),
         ("laboratorio", True),
         ("codigo", True),
         ("cups_codigo", True),
@@ -1292,33 +1294,33 @@ def generar_plantilla_xlsx():
     anchos = {
         'A': 14, 'B': 35, 'C': 22, 'D': 16, 'E': 20, 'F': 18,
         'G': 16, 'H': 18, 'I': 24, 'J': 12, 'K': 22,
-        'L': 22, 'M': 14, 'N': 18, 'O': 10, 'P': 12
+        'L': 22, 'M': 14, 'N': 18, 'O': 10, 'P': 12, 'Q': 16
     }
 
     # ── Ejemplos ─────────────────────────────────────────────────────
     ejemplo_med = [
         "MEDICAMENTO", "ACETAMINOFEN", "TABLETA", "500MG",
-        "CAJA X 10", "GENFAR", "770123456", "70005",
+        "CAJA X 10", "TABLETA", "GENFAR", "770123456", "70005",
         "2020M-0012345", "", "",
         "Puerto Tejada", "LOTE001", "2026-12-31", "100", "20"
     ]
 
     ejemplo_disp = [
         "DISPOSITIVO", "GUANTES QUIRURGICOS", "NO APLICA", "",
-        "CAJA X 100", "ECOPIEL", "", "70905",
+        "CAJA X 100", "UNIDAD", "ECOPIEL", "", "70905",
         "INVIMA-2025E-001234", "3 AÑOS", "I",
         "", "LOTE002", "", "500", "50"  # fecha_vencimiento vacío intencional
     ]
 
     # ── Fila 1: Título ───────────────────────────────────────────────
-    ws.merge_cells('A1:P1')
+    ws.merge_cells('A1:Q1')
     ws['A1'].value = "PLANTILLA DE CARGA MASIVA - KARDEX FARMACIA"
     ws['A1'].font = Font(bold=True, size=14, name='Arial', color='1E3A8A')
     ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 35
 
     # ── Fila 2: Instrucciones ────────────────────────────────────────
-    ws.merge_cells('A2:P2')
+    ws.merge_cells('A2:Q2')
     ws['A2'].value = (
         "Columnas con fondo AZUL = OBLIGATORIAS, fondo GRIS = opcionales. "
         "Borre las filas de ejemplo antes de importar. "
@@ -1361,10 +1363,12 @@ def generar_plantilla_xlsx():
         celda.fill = fondo_ejemplo
         celda.border = borde_fino
     # Resaltar la celda vacía de fecha_vencimiento en el ejemplo dispositivo
-    ws.cell(row=ROW_DISP, column=14).fill = fondo_rojo_aviso
+    # Resaltar la celda vacía de fecha_vencimiento en el ejemplo dispositivo
+    # (columna O = fecha_vencimiento después de agregar unidad_medida)
+    ws.cell(row=ROW_DISP, column=15).fill = fondo_rojo_aviso
 
     # ── Fila 7: Nota informativa ─────────────────────────────────────
-    ws.merge_cells('A7:P7')
+    ws.merge_cells('A7:Q7')
     ws['A7'].value = (
         "➡️  En el ejemplo DISPOSITIVO la fecha de vencimiento se dejó vacía "
         "porque los dispositivos suelen no tener fecha de expiración. "
@@ -1396,7 +1400,7 @@ def generar_plantilla_xlsx():
         errorTitle='Clasificación inválida',
         error='Use I, II o III para clasificación de riesgo.'
     )
-    dv_clasif.sqref = 'K8:K10000'
+    dv_clasif.sqref = 'L8:L10000'
     ws.add_data_validation(dv_clasif)
 
     # Fecha de vencimiento: validación de fecha
@@ -1407,7 +1411,7 @@ def generar_plantilla_xlsx():
         errorTitle='Fecha inválida',
         error='Ingrese la fecha en formato YYYY-MM-DD (ej: 2026-12-31). Deje vacío si no aplica.'
     )
-    dv_date.sqref = 'N8:N10000'
+    dv_date.sqref = 'O8:O10000'
     ws.add_data_validation(dv_date)
 
     # Cantidad: entero >= 0
@@ -1420,7 +1424,7 @@ def generar_plantilla_xlsx():
         errorTitle='Cantidad inválida',
         error='La cantidad debe ser un número entero >= 0.'
     )
-    dv_qty.sqref = 'O8:O10000'
+    dv_qty.sqref = 'P8:P10000'
     ws.add_data_validation(dv_qty)
 
     # Stock mínimo: entero >= 0
@@ -1433,7 +1437,7 @@ def generar_plantilla_xlsx():
         errorTitle='Stock mínimo inválido',
         error='El stock mínimo debe ser un número entero >= 0.'
     )
-    dv_stock.sqref = 'P8:P10000'
+    dv_stock.sqref = 'Q8:Q10000'
     ws.add_data_validation(dv_stock)
 
     # ── Congelar paneles ──────────────────────────────────────────────
