@@ -282,8 +282,13 @@ def registrar_salida_paciente_inteligente(usuario, nombre_medicamento, cantidad_
             }
 
             if medicamento_id:
-                # Busqueda exacta por ID del medicamento (mas confiable que el nombre)
-                filtro['medicamento_id'] = medicamento_id
+                # El frontend agrupa visualmente medicamentos con el mismo
+                # principio_activo + forma_farmaceutica. Buscamos todos los stocks
+                # que coincidan, no solo el medicamento_id exacto, para evitar
+                # falsos stock insuficiente cuando hay registros duplicados
+                med_ref = Medicamento.objects.get(id=medicamento_id)
+                filtro['medicamento__principio_activo'] = med_ref.principio_activo
+                filtro['medicamento__forma_farmaceutica'] = med_ref.forma_farmaceutica
             else:
                 filtro['medicamento__principio_activo__iexact'] = nombre_medicamento.strip()
 
