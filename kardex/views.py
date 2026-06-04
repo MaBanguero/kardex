@@ -1547,6 +1547,54 @@ def api_eliminar_usuario(request):
 
 
 # ==============================================================================
+# ==============================================================================
+# API: CERRAR TURNO DE ENFERMERA (ADMIN/REGENTE)
+# ==============================================================================
+
+
+@login_required
+@require_POST
+def api_cerrar_turno(request):
+    """
+    Desactiva manualmente un turno de enfermera.
+    Solo ADMIN y REGENTE pueden cerrar turnos.
+    Útil cuando una enfermera no pudo cerrar su turno
+    y otra necesita iniciar sesión.
+    """
+    grupos = request.user.groups.values_list('name', flat=True)
+    if 'ADMIN' not in grupos and 'REGENTE' not in grupos:
+        return JsonResponse({'status': 'error', 'mensaje': 'No autorizado'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'mensaje': 'Método no permitido'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        turno_id = data.get('turno_id')
+
+        if not turno_id:
+            return JsonResponse({'status': 'error', 'mensaje': 'ID de turno requerido.'}, status=400)
+
+        turno = TurnoEnfermera.objects.get(id=turno_id)
+
+        if not turno.activo:
+            return JsonResponse({'status': 'error', 'mensaje': 'Este turno ya estaba inactivo.'}, status=400)
+
+        turno.activo = False
+        turno.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'mensaje': f'Turno de {turno.enfermera.get_full_name() or turno.enfermera.username} cerrado correctamente.'
+        })
+
+    except TurnoEnfermera.DoesNotExist:
+        return JsonResponse({'status': 'error', 'mensaje': 'Turno no encontrado.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'mensaje': str(e)}, status=400)
+
+
+# ==============================================================================
 # API: CARGA RIPS (desde la web)
 # ==============================================================================
 

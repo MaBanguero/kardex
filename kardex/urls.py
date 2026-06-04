@@ -63,6 +63,7 @@ urlpatterns = [
     path('api/plantilla-usuarios/', views.descargar_plantilla_usuarios, name='plantilla_usuarios'),
     path('api/carga-masiva-usuarios/', views.api_carga_masiva_usuarios, name='api_carga_masiva_usuarios'),
     path('api/cargar-rips/', views.api_cargar_rips, name='api_cargar_rips'),
+    path('api/cerrar-turno/', views.api_cerrar_turno, name='api_cerrar_turno'),
 
     # ==========================================
     # 5. CONCILIACIÓN RIPS

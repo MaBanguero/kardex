@@ -258,6 +258,7 @@
                     <th class="px-6 py-5">Inicio</th>
                     <th class="px-6 py-5">Expira</th>
                     <th class="px-6 py-5 text-right">Tiempo Restante</th>
+                    <th class="px-6 py-5 text-right">Acción</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
@@ -284,10 +285,15 @@
                             <i class="fas fa-clock text-amber-500 mr-1"></i>{{ t.expires_in_minutes }} min
                         </span>
                     </td>
+                    <td class="px-6 py-5 text-right">
+                        <button onclick="cerrarTurno({{ t.id }}, '{{ t.enfermera.get_full_name|default:t.enfermera.username|escapejs }}')" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 border border-red-200 hover:border-red-300 active:scale-95">
+                            <i class="fas fa-door-closed"></i> Cerrar
+                        </button>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="p-12 text-center text-slate-400 italic">
+                    <td colspan="6" class="p-12 text-center text-slate-400 italic">
                         <i class="fas fa-moon text-3xl mb-3 opacity-30 block"></i>
                         No hay turnos activos en ninguna sede.
                     </td>
@@ -796,6 +802,31 @@ function actualizarContadoresTurnos() {
         }
     });
     setTimeout(actualizarContadoresTurnos, 30000);
+}
+
+// Cerrar turno de enfermera manualmente (ADMIN/REGENTE)
+function cerrarTurno(turnoId, nombreEnfermera) {
+    if(!confirm(`¿Cerrar el turno de ${nombreEnfermera}?\n\nEsto permitirá que otra enfermera inicie sesión en su lugar.`)) return;
+    fetch("{% url 'api_cerrar_turno' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ turno_id: turnoId })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if(d.status === 'success') {
+            alert('✅ ' + d.mensaje);
+            location.reload();
+        } else {
+            alert('❌ ' + d.mensaje);
+        }
+    })
+    .catch(err => {
+        alert('❌ Error de conexión: ' + err.message);
+    });
 }
 </script>
 {% endblock %}
