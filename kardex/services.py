@@ -444,7 +444,7 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
         })
 
     col_saldo_ini = 13
-    col_ingresos_start = 13
+    col_ingresos_start = 14
     col_ingresos_end = col_ingresos_start + (max_ingresos * 2) - 1
     col_total_ingresos = col_ingresos_end + 1
     col_egresos_start = col_total_ingresos + 1
