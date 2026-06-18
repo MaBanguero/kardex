@@ -356,10 +356,8 @@ def calcular_semaforo(fecha_vencimiento):
 
     if dias_restantes < 0:
         return 'VENCIDO'
-    elif dias_restantes < 30:
-        return 'ROJO'
     elif dias_restantes < 90:
-        return 'NARANJA'
+        return 'ROJO'
     elif dias_restantes < 180:
         return 'AMARILLO'
     else:
