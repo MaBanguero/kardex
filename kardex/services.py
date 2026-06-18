@@ -443,7 +443,7 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
             'saldo_final': saldo_final
         })
 
-    col_saldo_ini = 12
+    col_saldo_ini = 13
     col_ingresos_start = 13
     col_ingresos_end = col_ingresos_start + (max_ingresos * 2) - 1
     col_total_ingresos = col_ingresos_end + 1
@@ -484,8 +484,9 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
         ("A", "ITEM"), ("B", "MEDICAMENTOS (PRINCIPIO ACTIVO)"), ("C", "FORMA FARMACÉUTICA"),
         ("D", "CONCENTRACIÓN"), ("E", "PRESENTACIÓN COMERCIAL"),
         ("F", "LOTE"), ("G", "FECHA DE VENCIMIENTO"),
-        ("H", "UNIDAD DE MEDIDA"), ("I", "REGISTRO INVIMA"),
-        ("J", "SEMAFORIZACIÓN"), ("K", "MEDICAMENTO LASA")
+        ("H", "UNIDAD DE MEDIDA"), ("I", "VIDA UTIL"),
+        ("J", "REGISTRO INVIMA"),
+        ("K", "SEMAFORIZACIÓN"), ("L", "MEDICAMENTO LASA")
     ]
     for letra, titulo in columnas_base:
         rango = f"{letra}7:{letra}8"
@@ -516,7 +517,7 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
     estilizar_rango(f"{get_column_letter(col_egresos_start)}8:{get_column_letter(col_egresos_end)}8", fuente_negrita,
                     alineacion_centro, fondo_gris, borde_fino)
 
-    for letra, ancho in {'A': 5, 'B': 30, 'C': 18, 'D': 15, 'E': 12, 'F': 12, 'G': 10, 'H': 15, 'I': 10, 'J': 12, 'K': 12}.items():
+    for letra, ancho in {'A': 5, 'B': 30, 'C': 18, 'D': 15, 'E': 12, 'F': 12, 'G': 10, 'H': 15, 'I': 12, 'J': 10, 'K': 12, 'L': 12}.items():
         ws.column_dimensions[letra].width = ancho
     ws.column_dimensions[get_column_letter(col_saldo_ini)].width = 12
     ws.column_dimensions[get_column_letter(col_total_ingresos)].width = 11
@@ -543,6 +544,7 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
             stock.lote,
             stock.fecha_vencimiento.strftime("%d/%m/%Y") if stock.fecha_vencimiento else 'S/D',
             getattr(m, 'unidad_medida', ''),  # UNIDAD DE MEDIDA
+            getattr(m, 'vida_util', '') or '',  # VIDA UTIL
             m.registro_invima or '',
             semaforo,  # SEMAFORIZACIÓN
             '',  # MEDICAMENTO LASA
@@ -560,10 +562,10 @@ def _write_medicamentos_kardex(ws, mes, anio, ubicacion_id, hoy=None):
         }
         color_hex = colores_semaforo.get(semaforo, '')
         if color_hex:
-            ws.cell(row=fila_actual, column=10).fill = PatternFill(
+            ws.cell(row=fila_actual, column=11).fill = PatternFill(
                 start_color=color_hex, end_color=color_hex, fill_type='solid'
             )
-            ws.cell(row=fila_actual, column=10).font = Font(
+            ws.cell(row=fila_actual, column=11).font = Font(
                 bold=True, size=9, name='Arial',
                 color='FFFFFF' if semaforo in ('VENCIDO', 'ROJO', 'NARANJA', 'VERDE') else '000000'
             )
