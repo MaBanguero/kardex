@@ -139,12 +139,13 @@
             mHtml += `
             <div class="p-6 border-b border-slate-100">
                 <div class="flex justify-between items-start mb-4">
-                    <div class="pr-4"><h4 class="font-bold text-slate-900 leading-tight">${nombreCompleto}</h4><p class="text-[10px] text-slate-500 uppercase mt-1 font-bold">${i.forma_farmaceutica}</p><div class="flex gap-1.5 mt-1 flex-wrap"><span class="inline-block text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">${i.unidad_medida || '—'}</span>${i.vida_util ? `<span class="inline-block text-[10px] font-bold bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">🕐 ${i.vida_util}</span>` : ''}</div></div>
+                    <div class="pr-4"><h4 class="font-bold text-slate-900 leading-tight">${nombreCompleto}</h4><p class="text-[10px] text-slate-500 uppercase mt-1 font-bold">${i.forma_farmaceutica}</p><div class="flex gap-1.5 mt-1 flex-wrap"><span class="inline-block text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">${i.unidad_medida || '—'}</span></div></div>
                     <div class="text-right"><span id="stock-qty-mob-${i.id_virtual}" class="text-3xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></div>
                 </div>
                 <div class="flex gap-3 mb-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div class="flex-1"><p class="text-[9px] font-bold text-slate-400 mb-1">LOTE</p>${badge}</div>
                     <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VENCE</p><p class="text-[11px] font-bold text-slate-600">${i.fecha_txt}</p>${semaforoBadge}</div>
+                    <div class="flex-1 border-l pl-3"><p class="text-[9px] font-bold text-slate-400 mb-1">VIDA UTIL</p><p class="text-[11px] font-bold text-purple-700">${i.vida_util || '—'}</p></div>
                 </div>
                <button onclick='abrirModal(${JSON.stringify(i.id_virtual)}, ${JSON.stringify(i.principio_activo).replace(/'/g, "\\u0027")}, ${JSON.stringify(i.cups_codigo || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.presentacion || i.concentracion || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.medicamento_id || "").replace(/'/g, "\\u0027")})' class="w-full bg-slate-900 text-white py-4 rounded-xl text-sm font-bold shadow-lg active:scale-95 transition">Registrar Movimiento</button>
             </div>`;
@@ -153,7 +154,7 @@
             <tr class="hover:bg-slate-50 transition">
                 <td class="px-6 py-5"><p class="font-bold text-slate-800">${nombreCompleto}</p><p class="text-[10px] text-slate-500 uppercase font-bold">${i.forma_farmaceutica}</p></td>
                 <td class="px-6 py-5 text-center"><span class="text-[10px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-100">${i.unidad_medida || '—'}</span></td>
-                <td class="px-6 py-5 text-center"><span class="text-[10px] font-bold bg-orange-50 text-orange-700 px-2.5 py-1 rounded border border-orange-200">${i.vida_util || '—'}</span></td>
+                <td class="px-6 py-5 text-center"><span class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded border border-purple-200">${i.vida_util || '—'}</span></td>
                 <td class="px-6 py-5">${badge}${semaforoBadge}<p class="text-[10px] text-slate-400 mt-2 font-bold"><i class="far fa-calendar-check mr-1 opacity-50"></i>${i.fecha_txt}</p></td>
                 <td class="px-6 py-5 text-center"><span id="stock-qty-${i.id_virtual}" class="text-2xl font-black ${low ? 'text-red-500' : 'text-blue-600'}">${i.cantidad_actual}</span></td>
                 <td class="px-6 py-5 text-right"><button onclick='abrirModal(${JSON.stringify(i.id_virtual)}, ${JSON.stringify(i.principio_activo).replace(/'/g, "\\u0027")}, ${JSON.stringify(i.cups_codigo || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.presentacion || i.concentracion || "").replace(/'/g, "\\u0027")}, ${JSON.stringify(i.medicamento_id || "").replace(/'/g, "\\u0027")})' class="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:border-blue-500 hover:text-blue-600 shadow-sm transition">Registrar</button></td>
