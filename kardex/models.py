@@ -102,6 +102,11 @@ class Medicamento(models.Model):
     unidad_medida = models.CharField(max_length=50, null=True, blank=True,
                                       help_text="Ej: Tableta, Ampolleta, mL, Gramo")
 
+    class Meta:
+        unique_together = ('principio_activo', 'forma_farmaceutica', 'concentracion')
+        verbose_name = 'Medicamento'
+        verbose_name_plural = 'Medicamentos'
+
     def __str__(self):
         conc = f" {self.concentracion}" if self.concentracion else ""
         return f"{self.principio_activo}{conc} - {self.forma_farmaceutica}"

@@ -1114,7 +1114,8 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
             medicamento.cups_codigo = cups_codigo
 
             if tipo == 'MEDICAMENTO':
-                medicamento.concentracion = row.get('concentracion', '')
+                # Usar conc (ya normalizado a None si viene vacío) en vez de re-leer row
+                medicamento.concentracion = conc
             else:
                 medicamento.concentracion = ''
                 medicamento.vida_util = row.get('vida_util', '')

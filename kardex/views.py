@@ -551,7 +551,8 @@ def api_gestion_producto(request):
             else:
                 medicamento.codigo = None
             medicamento.tipo = tipo_val
-            medicamento.concentracion = data.get('concentracion', medicamento.concentracion) if tipo_val == 'MEDICAMENTO' else None
+            # Usar lookup_concentracion (ya normalizado a None si viene vacío) en vez de re-leer data
+            medicamento.concentracion = lookup_concentracion if tipo_val == 'MEDICAMENTO' else None
             medicamento.presentacion = data.get('presentacion', medicamento.presentacion)
             medicamento.laboratorio = data.get('laboratorio', medicamento.laboratorio)
             medicamento.registro_invima = data.get('registro_invima', medicamento.registro_invima)
