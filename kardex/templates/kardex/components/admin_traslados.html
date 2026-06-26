@@ -106,6 +106,11 @@
     let inventarioCache = [];
     let trasladoTimer = null;
 
+    // Obtener el ID de la bodega principal desde el contexto de Django
+    const sedes = {{ sedes_json|safe }};
+    const bodegaPrincipal = sedes.find(s => s.es_bodega_principal);
+    const bodegaPrincipalId = bodegaPrincipal ? bodegaPrincipal.id : null;
+
     document.addEventListener('DOMContentLoaded', function() {
         // Cargar inventario al iniciar
         fetch("{% url 'sincronizar_inventario_api' %}")
@@ -136,8 +141,11 @@
     function buscarProductos(q) {
         const container = document.getElementById('traslado-resultados');
         // Mostrar solo productos de bodega principal con stock > 0 que coincidan
+        // Filtrar SOLO stock de la bodega principal
         const results = inventarioCache.filter(i => {
-            return i.busqueda && i.busqueda.includes(q) && i.cantidad_actual > 0;
+            return i.ubicacion_id === bodegaPrincipalId
+                && i.busqueda && i.busqueda.includes(q)
+                && i.cantidad_actual > 0;
         }).slice(0, 15);
 
         container.innerHTML = '';
