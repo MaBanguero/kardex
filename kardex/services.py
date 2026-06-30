@@ -1090,7 +1090,9 @@ def procesar_carga_masiva_productos(usuario, archivo_csv):
                 forma = 'NO APLICA'
                 medicamento, _ = Medicamento.objects.get_or_create(
                     principio_activo=principio,
-                    forma_farmaceutica=forma
+                    forma_farmaceutica=forma,
+                    tipo='DISPOSITIVO',
+                    defaults={'tipo': 'DISPOSITIVO'}
                 )
             else:
                 forma = row.get('forma_farmaceutica', row.get('forma', '')).strip().upper()

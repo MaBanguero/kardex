@@ -524,11 +524,13 @@ def api_gestion_producto(request):
             forma_farmaceutica = data.get('forma_farmaceutica', '').strip().upper()
 
             if tipo_val == 'DISPOSITIVO':
-                # Para DISPOSITIVO: lookup solo por principio_activo, forma_farmaceutica = 'NO APLICA'
+                # Para DISPOSITIVO: lookup por principio_activo + tipo + forma_farmaceutica
+                # para evitar MultipleObjectsReturned si existe un MEDICAMENTO con mismo PA
                 forma_farmaceutica = 'NO APLICA'
                 medicamento, _ = Medicamento.objects.get_or_create(
                     principio_activo=principio_activo,
-                    defaults={'forma_farmaceutica': forma_farmaceutica}
+                    tipo='DISPOSITIVO',
+                    defaults={'forma_farmaceutica': forma_farmaceutica, 'tipo': 'DISPOSITIVO'}
                 )
                 medicamento.forma_farmaceutica = forma_farmaceutica
             else:
